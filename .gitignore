@@ -1,0 +1,6 @@
+# Ignorer les configurations locales sensibles
+includes/db.php
+.env
+
+# Ignorer les uploads temporaires si nécessaire
+# (Attention, sur GitHub/Vercel, les images téléversées localement disparaissent à chaque déploiement)
