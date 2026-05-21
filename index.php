@@ -217,7 +217,7 @@ $photos = $queryGallery->fetchAll();
         </div>
     </section>
 
-    <section id="gamme" class="py-24 bg-slate-50">
+  <section id="gamme" class="py-24 bg-slate-50">
         <div class="max-w-7xl mx-auto px-5">
             <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
                 <h2 class="text-3xl sm:text-4xl font-extrabold text-galaDark tracking-tight">Notre Gamme Complète</h2>
@@ -230,7 +230,7 @@ $photos = $queryGallery->fetchAll();
                     
                     <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
                         <span class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse">
-                            Épuisé / Solde
+                            Épuisé
                         </span>
                     <?php elseif (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
                         <span class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10">
@@ -270,19 +270,31 @@ $photos = $queryGallery->fetchAll();
                         </div>
 
                         <?php if (!(isset($p['stock']) && $p['stock'] <= 0)): ?>
-                        <div id="selector-container-<?= $p['id'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row gap-2 items-center justify-between transition-all">
+                        <div id="selector-container-<?= $p['id'] ?>" data-stock="<?= $p['stock'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row gap-2 items-center justify-between transition-all">
                             <div class="flex items-center gap-2 w-full sm:w-auto">
-                                <select id="quantity-<?= $p['id'] ?>" class="w-1/2 sm:w-16 p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-galaGreen outline-none">
-                                    <?php for($i=1; $i<=10; $i++): ?>
-                                        <option value="<?= $i ?>"><?= $i ?></option>
-                                    <?php endfor; ?>
-                                </select>
+                             <div class="flex items-center bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-galaGreen transition overflow-hidden h-9 w-full sm:w-28">
+    <button type="button" onclick="decrementQuantity(<?= $p['id'] ?>)" class="px-2 text-slate-500 hover:bg-slate-100 h-full transition select-none">
+        <i class="fas fa-minus text-xs"></i>
+    </button>
+    
+    <input 
+        id="quantity-<?= $p['id'] ?>" 
+        type="number" 
+        value="1" 
+        min="1" 
+        class="w-full text-center font-bold text-sm text-slate-700 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    >
+    
+    <button type="button" onclick="incrementQuantity(<?= $p['id'] ?>)" class="px-2 text-slate-500 hover:bg-slate-100 h-full transition select-none">
+        <i class="fas fa-plus text-xs"></i>
+    </button>
+</div>
                                 <select id="unit-<?= $p['id'] ?>" class="w-1/2 sm:w-24 p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-galaGreen outline-none">
                                     <option value="carton(s)">Carton(s)</option>
                                     <option value="boite(s)">Boîte(s)</option>
                                 </select>
                             </div>
-                            <button onclick="submitDirectOrder(<?= $p['id'] ?>, '<?=  htmlspecialchars(addslashes($p['nom'])) ?>')" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-3 py-2.5 rounded-xl hover:bg-[#007A3D] transition whitespace-nowrap">
+                            <button onclick="checkStockAndSubmit(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nom'])) ?>')" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-3 py-2.5 rounded-xl hover:bg-[#007A3D] transition whitespace-nowrap">
                                 Valider
                             </button>
                         </div>
@@ -294,7 +306,6 @@ $photos = $queryGallery->fetchAll();
             </div>
         </div>
     </section>
-
     <section id="galerie" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-5">
             <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -490,7 +501,25 @@ $photos = $queryGallery->fetchAll();
             menuBtn.querySelector('i').className = 'fas fa-bars-staggered';
         });
     });
+function checkStockAndSubmit(id, prodNom) {
+        // Récupération de la quantité choisie par le client
+        const quantitySelected = parseInt(document.getElementById('quantity-' + id).value);
+        
+        // Récupération du stock réel injecté dynamiquement depuis PHP
+        const container = document.getElementById('selector-container-' + id);
+        const currentStock = parseInt(container.getAttribute('data-stock'));
 
+        // Vérification si la demande dépasse le stock
+        if (quantitySelected > currentStock) {
+            alert("Désolé, notre stock pour '" + prodNom + "' est inférieur à votre demande.\n\nStock actuel disponible : " + currentStock + " pièces ou cartons.");
+            return false; // Bloque la validation
+        }
+
+        // Si tout est bon, on exécute votre fonction d'origine pour traiter la commande
+        if (typeof submitDirectOrder === "function") {
+            submitDirectOrder(id, prodNom);
+        }
+    }
     // Envoi asynchrone du formulaire (Contact)
     document.getElementById('contactForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -535,7 +564,19 @@ $photos = $queryGallery->fetchAll();
             document.body.classList.toggle('overflow-hidden');
         }
     }
+function incrementQuantity(id) {
+    const input = document.getElementById('quantity-' + id);
+    if (input) {
+        input.value = parseInt(input.value) + 1;
+    }
+}
 
+function decrementQuantity(id) {
+    const input = document.getElementById('quantity-' + id);
+    if (input && parseInt(input.value) > 1) {
+        input.value = parseInt(input.value) - 1;
+    }
+}
     // Fermeture des modales au clic à l'extérieur
     window.addEventListener('click', (event) => {
         if (event.target.classList.contains('bg-slate-900/60')) {
