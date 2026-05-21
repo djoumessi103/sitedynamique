@@ -24,16 +24,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Connexion Administration - Gala</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a' } } } }
+        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaGold: '#f8f9f8f1' } } } }
     </script>
 </head>
-<body class="bg-slate-900 h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md">
+<body class="bg-galaGold: '#f8f9f8f1', h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl w-full max-w-md">
         <div class="text-center mb-8">
-            <h2 class="text-3xl font-black text-slate-800">Gala Admin Panel</h2>
+            <h2 class="text-2xl md:text-3xl font-black text-slate-800">Gala Admin Panel</h2>
             <p class="text-slate-400 text-sm mt-1">Espace de gestion restreint</p>
         </div>
         
@@ -50,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mot de passe</label>
                 <input type="password" name="password" class="w-full p-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-galaGreen/50 outline-none transition" required>
             </div>
-            <button type="submit" class="w-full bg-galaDark text-white font-bold py-4 rounded-2xl hover:bg-galaGreen transition-all duration-300 shadow-xl">
-                S'authentifier
+            <button type="submit" class="w-full bg-galaGreen hover:bg-galaDark text-white p-4 rounded-2xl font-bold transition shadow-lg tracking-wide uppercase text-sm">
+                Se connecter
             </button>
         </form>
     </div>

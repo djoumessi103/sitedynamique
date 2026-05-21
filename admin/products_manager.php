@@ -4,6 +4,7 @@ if (!isset($_SESSION['admin_logged'])) { header('Location: login.php'); exit; }
 require_once '../includes/db.php';
 
 $success = ""; $error = "";
+$current_page = basename($_SERVER['PHP_SELF']);
 
 // Traitement Ajout / Modification de Produit
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,17 +26,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         
         if (in_array($fileExtension, $allowedExtensions)) {
-            // Nettoyage et unicité du nom de fichier
             $newFileName = time() . '_' . uniqid() . '.' . $fileExtension;
             $uploadFileDir = '../assets/img/';
             
-            // Créer le dossier s'il n'existe pas
             if(!is_dir($uploadFileDir)){
-                mkdir($uploadFileDir, 0755, true);
+                mkdir($uploadFileDir, 0775, true);
             }
             
             $dest_path = $uploadFileDir . $newFileName;
-            
             if(move_uploaded_file($fileTmpPath, $dest_path)) {
                 $img = $newFileName;
             }
@@ -43,31 +41,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($id > 0) {
-        // Mode Modification
         if ($img !== "default.png") {
-            // Si une nouvelle image a été téléchargée, on la met à jour
-            $stmt = $pdo->prepare("UPDATE products SET nom = ?, format = ?, prix = ?, stock = ?, image_url = ? WHERE id = ?");
-            $stmt->execute([$nom, $format, $prix, $stock, $img, $id]);
+            $sql = "UPDATE products SET nom=?, format=?, prix=?, stock=?, image_url=? WHERE id=?";
+            $params = [$nom, $format, $prix, $stock, $img, $id];
         } else {
-            // Sinon, on garde l'ancienne image
-            $stmt = $pdo->prepare("UPDATE products SET nom = ?, format = ?, prix = ?, stock = ? WHERE id = ?");
-            $stmt->execute([$nom, $format, $prix, $stock, $id]);
+            $sql = "UPDATE products SET nom=?, format=?, prix=?, stock=? WHERE id=?";
+            $params = [$nom, $format, $prix, $stock, $id];
         }
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $success = "Le produit a bien été mis à jour.";
     } else {
-        // Mode Ajout
         $stmt = $pdo->prepare("INSERT INTO products (nom, format, prix, stock, image_url) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$nom, $format, $prix, $stock, $img]);
-        $success = "Nouveau produit ajouté au catalogue.";
+        $success = "Nouveau produit ajouté avec succès.";
     }
 }
 
-// Suppression Produit
+// Suppression de Produit
 if (isset($_GET['delete'])) {
-    $del_id = (int)$_GET['delete'];
-    $pdo->prepare("DELETE FROM products WHERE id = ?")->execute([$del_id]);
-    header('Location: products_manager.php');
-    exit;
+    $idDel = (int)$_GET['delete'];
+    $stmtImg = $pdo->prepare("SELECT image_url FROM products WHERE id = ?");
+    $stmtImg->execute([$idDel]);
+    $pImg = $stmtImg->fetch();
+    if($pImg && $pImg['image_url'] !== 'default.png') {
+        $path = "../assets/img/" . $pImg['image_url'];
+        $path = "../assets/img/" . $pImg['image_url'];
+        if(file_exists($path)) { unlink($path); }
+    }
+    $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
+    $stmt->execute([$idDel]);
+    $success = "Produit supprimé du catalogue.";
 }
 
 $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
@@ -76,128 +80,153 @@ $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Gestion Produits & Prix - Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin - Catalogue Produits</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
-        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a' } } } }
+        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a', galaGold: '#f8f9f8f1', } } } }
     </script>
 </head>
-<body class="bg-slate-50 font-sans flex min-h-screen">
+<body class="bg-slate-50 font-sans min-h-screen flex flex-col md:flex-row">
 
-    <aside class="w-64 bg-galaDark text-white p-6 flex flex-col justify-between shadow-xl">
+    <aside class="hidden md:flex w-64 bg-galaGold text-galaGreen p-6 flex-col justify-between shadow-xl min-h-screen sticky top-0">
         <div>
             <div class="mb-10">
-                <h1 class="text-2xl font-black text-galaGreen"> Mayonnaise Gala Admin </h1>
+                <h1 class="text-2xl font-black text-galaGreen">Gala<span class="text-[#E30613]"> Admin</span></h1>
+                <p class="text-xs font-bold text-slate-700/80">Espace Restreint</p>
             </div>
-            <nav class="space-y-2">
-                <a href="messages.php" class="flex items-center space-x-3 py-3 px-4 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition">
-                    <i class="fas fa-envelope"></i> <span>Messages</span>
-                </a>
-                <a href="products_manager.php" class="flex items-center space-x-3 py-3 px-4 rounded-xl bg-galaGreen font-bold text-white shadow-md">
-                    <i class="fas fa-box-open"></i> <span>Produits & Stocks</span>
-                </a>
-                <a href="gallery.php" class="flex items-center space-x-3 py-3 px-4 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition">
-                    <i class="fas fa-images"></i> <span>Galerie</span>
-                </a>
-                <div class="pt-6 my-4 border-t border-slate-800">
-                    <a href="../index.php" class="flex items-center space-x-3 py-3 px-4 rounded-xl text-amber-400 hover:bg-amber-500/10 transition font-medium">
-                        <i class="fas fa-globe"></i> <span>Consulter le site</span>
-                    </a>
-                </div>
-            </nav>
+           <nav class="space-y-2">
+    <a href="messages.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'messages.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+        <i class="fas fa-envelope w-5 <?= ($current_page == 'messages.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+        <span>Messages</span>
+    </a>
+    
+    <a href="products_manager.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'products_manager.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+        <i class="fas fa-box w-5 <?= ($current_page == 'products_manager.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+        <span>Produits</span>
+    </a>
+    
+    <a href="gallery.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'gallery.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+        <i class="fas fa-images w-5 <?= ($current_page == 'gallery.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+        <span>Galerie</span>
+    </a>
+</nav>
         </div>
-        <a href="logout.php" class="flex items-center space-x-3 py-3 px-4 rounded-xl text-rose-400 hover:bg-rose-500/10 transition font-bold">
-            <i class="fas fa-sign-out-alt"></i> <span>Déconnexion</span>
+        
+        <a href="logout.php" class="flex items-center space-x-3 p-3 rounded-xl text-rose-700 hover:bg-rose-700/10 transition font-bold mt-auto">
+            <i class="fas fa-sign-out-alt w-5"></i> <span>Déconnexion</span>
         </a>
     </aside>
 
-    <main class="flex-1 p-8 md:p-12 overflow-y-auto">
-        <h2 class="text-3xl font-black text-slate-800 mb-2">Catalogue Produits</h2>
-        <p class="text-sm text-slate-400 mb-10">Ajustez les tarifs, modifiez les images et passez les articles en rupture en mettant le stock à 0.</p>
-
-        <?php if($success): ?>
-            <div class="bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 font-bold border border-emerald-100"><?= $success ?></div>
-        <?php endif; ?>
-
-        <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-10">
-            <h3 id="formTitle" class="font-bold text-lg mb-4 text-slate-700 flex items-center space-x-2">
-                <i class="fas fa-plus-circle text-galaGreen"></i> <span>Ajouter ou Modifier un Produit</span>
-            </h3>
+    <div class="md:hidden bg-galaGold text-galaGreen px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-md">
+        <h1 class="text-lg font-black text-galaGreen">Gala<span class="text-[#E30613]"> Admin</span></h1>
+        <div class="flex space-x-1 items-center">
+            <a href="messages.php" class="p-2 text-xl text-slate-700"><i class="fas fa-envelope"></i></a>
             
-            <form method="POST" id="productForm" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                <input type="hidden" name="id" id="prodId" value="">
-                
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Nom du Produit</label>
-                    <input type="text" name="nom" id="prodNom" class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-galaGreen/50" required>
-                </div>
-                
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Format (ex: 1L, 500g)</label>
-                    <input type="text" name="format" id="prodFormat" class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-galaGreen/50" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Prix (FCFA)</label>
-                    <input type="number" name="prix" id="prodPrix" class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-galaGreen/50" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Quantité Stock</label>
-                    <input type="number" name="stock" id="prodStock" class="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-galaGreen/50" required>
-                </div>
-                
-                <div class="md:col-span-3">
-                    <label class="block text-xs font-bold text-slate-500 mb-1">Image du produit (JPG, PNG, WEBP)</label>
-                    <input type="file" name="image" id="prodImg" class="w-full p-2.5 rounded-xl border border-slate-200 outline-none bg-slate-50 text-sm file:mr-4 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-galaDark file:text-white hover:file:bg-galaGreen cursor-pointer">
-                </div>
-                
-                <div class="md:col-span-2 flex justify-end space-x-2">
-                    <button type="button" onclick="resetForm()" class="bg-slate-100 text-slate-600 px-5 py-3 rounded-xl font-bold text-sm hover:bg-slate-200 transition">Annuler</button>
-                    <button type="submit" class="bg-galaDark text-white hover:bg-galaGreen px-6 py-3 rounded-xl font-bold text-sm transition shadow-md">Enregistrer</button>
-                </div>
-            </form>
+            <a href="products_manager.php" class="p-2 text-xl text-white bg-galaDark rounded-xl px-3"><i class="fas fa-box"></i></a>
+            
+            <a href="gallery.php" class="p-2 text-xl text-slate-700"><i class="fas fa-images"></i></a>
+            <a href="logout.php" class="p-2 text-xl text-rose-700"><i class="fas fa-sign-out-alt"></i></a>
+        </div>
+    </div>
+    <main class="flex-1 p-4 md:p-10 w-full overflow-x-hidden">
+        <div class="mb-8">
+            <h2 class="text-2xl md:text-3xl font-black text-slate-800">Gestion des Produits</h2>
+            <p class="text-slate-400 text-sm">Ajoutez, modifiez ou retirez des articles de la vitrine.</p>
         </div>
 
-        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase">Visuel</th>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase">Désignation</th>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase">Format</th>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase">Tarif Actuel</th>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase">Statut Stock</th>
-                        <th class="p-5 text-xs font-bold text-slate-500 uppercase text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                    <?php foreach ($products as $p): ?>
-                    <tr class="hover:bg-slate-50/50 transition">
-                        <td class="p-5">
-                            <img src="../assets/img/<?= htmlspecialchars($p['image_url'] ?: 'default.png') ?>" class="w-12 h-12 object-contain rounded-lg border bg-white p-1">
-                        </td>
-                        <td class="p-5 font-bold text-slate-800"><?= htmlspecialchars($p['nom']) ?></td>
-                        <td class="p-5 text-slate-500 font-semibold"><?= htmlspecialchars($p['format'] ?? 'N/A') ?></td>
-                        <td class="p-5 text-galaGreen font-black"><?= number_format($p['prix'] ?? 0, 0, ',', ' ') ?> FCFA</td>
-                        <td class="p-5">
-                            <?php if (($p['stock'] ?? 1) <= 0): ?>
-                                <span class="bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-black border border-rose-100">RUPTURE</span>
-                            <?php else: ?>
-                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold border border-emerald-100">En Stock (<?= $p['stock'] ?>)</span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="p-5 text-center flex justify-center space-x-3 h-full items-center">
-                            <button onclick='editProduct(<?= json_encode($p) ?>)' class="text-amber-500 hover:text-amber-600 p-1 transition" title="Modifier">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <a href="products_manager.php?delete=<?= $p['id'] ?>" onclick="return confirm('Supprimer définitivement ce produit ?');" class="text-rose-400 hover:text-rose-600 p-1 transition" title="Supprimer">
-                                <i class="fas fa-trash-alt"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <?php if($success): ?>
+            <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-green-100"><?= $success ?></div>
+        <?php endif; ?>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            
+            <div class="bg-white p-6 rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 h-fit">
+                <h3 id="formTitle" class="text-lg font-bold text-slate-800 mb-5 flex items-center space-x-2">
+                    <i class="fas fa-plus-circle text-galaGreen"></i> <span>Ajouter ou Modifier un Produit</span>
+                </h3>
+                <form id="productForm" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="id" id="prodId">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Nom du produit</label>
+                        <input type="text" name="nom" id="prodNom" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 transition" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Format / Contenance</label>
+                        <input type="text" name="format" id="prodFormat" placeholder="Ex: Pot de 500g, Bouteille 1L" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 transition" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Prix (FCFA)</label>
+                            <input type="number" name="prix" id="prodPrix" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 transition" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Stock dispo</label>
+                            <input type="number" name="stock" id="prodStock" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 transition" required>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Image du produit</label>
+                        <input type="file" name="image" class="w-full p-2 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                    </div>
+                    <div class="pt-2 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                        <button type="submit" class="w-full bg-galaGreen hover:bg-galaDark text-white p-3 rounded-xl font-bold transition shadow-md">Enregistrer</button>
+                        <button type="button" onclick="resetForm()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 p-3 rounded-xl font-bold transition">Réinitialiser</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="xl:col-span-2 bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto block w-full">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase bg-slate-50/50">
+                                <th class="p-4 w-12">#</th>
+                                <th class="p-4">Aperçu</th>
+                                <th class="p-4">Désignation</th>
+                                <th class="p-4">Format</th>
+                                <th class="p-4">Prix</th>
+                                <th class="p-4">Stock</th>
+                                <th class="p-4 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($products as $index => $p): ?>
+                            <tr class="hover:bg-slate-50/50 transition border-b border-slate-50 <?= $p['stock'] == 0 ? 'bg-red-50/40 hover:bg-red-50/60' : '' ?>">
+                                <td class="p-4 text-slate-400 text-sm font-bold">#<?= $index + 1 ?></td>
+                                <td class="p-4">
+                                    <img src="../assets/img/<?= htmlspecialchars($p['image_url']) ?>" class="w-12 h-12 object-cover rounded-xl shadow-sm border border-slate-100">
+                                </td>
+                                <td class="p-4 font-bold text-slate-800"><?= htmlspecialchars($p['nom']) ?></td>
+                                <td class="p-4 text-slate-600"><?= htmlspecialchars($p['format']) ?></td>
+                                <td class="p-4 font-bold text-galaGreen"><?= number_format($p['prix'], 0, ',', ' ') ?> XAF</td>
+                                <td class="p-4">
+                                    <?php if ($p['stock'] == 0): ?>
+                                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 inline-flex items-center gap-1 animate-pulse">
+                                            <i class="fas fa-exclamation-triangle"></i> RUPTURE
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="px-2.5 py-1 rounded-full text-xs font-bold <?= $p['stock'] > 5 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700' ?>">
+                                            <?= $p['stock'] ?> pces
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="p-4 text-center space-x-1 whitespace-nowrap">
+                                    <button onclick='editProduct(<?= json_encode($p, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="text-amber-500 hover:bg-amber-50 p-2 rounded-lg transition" title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <a href="products_manager.php?delete=<?= $p['id'] ?>" onclick="return confirm('Supprimer définitivement ce produit ?');" class="text-rose-400 hover:text-rose-600 p-2 rounded-lg transition" title="Supprimer">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </main>
 
