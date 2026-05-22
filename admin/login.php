@@ -26,10 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Connexion Administration - Gala</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+   <script src="../assets/tailwind.js"></script>
     <script>
-        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaGold: '#f8f9f8f1' } } } }
+        tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a', galaGold: '#f8f9f8f1', } } } }
     </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-galaGold: '#f8f9f8f1', h-screen flex items-center justify-center p-4">
     <div class="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl w-full max-w-md">
