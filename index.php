@@ -174,11 +174,11 @@ $photos = $queryGallery->fetchAll();
                         Créée pour répondre aux exigences des gourmets, <strong class="text-galaGreen">GALA AGRO</strong> produit la Mayonnaise Gala pour offrir une expérience culinaire unique. Nos valeurs reposent sur la qualité locale, une hygiène irréprochable et une proximité constante avec nos consommateurs.
                     </p>
                     <div class="grid grid-cols-1 gap-4">
-                        <div class="flex items-center gap-4 p-5 rounded-2xl bg-[#007A3D]-50 border-l-4 border-galaGreen hover:bg-green-100 transition-colors">
+                        <div class="flex items-center gap-4 p-5 rounded-2xl bg-[#007A3D] border-l-4 border-galaGreen hover:bg-green-100 transition-colors">
                             <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#007A3D] shrink-0 shadow-sm"><i class="fas fa-egg"></i></div>
                             <span class="font-bold text-slate-700 text-sm sm:text-base">Huile raffinée & œufs frais du jour</span>
                         </div>
-                        <div class="flex items-center gap-4 p-5 rounded-2xl bg-[#007A3D]-50 border-l-4 border-galaGreen hover:bg-green-100 transition-colors">
+                        <div class="flex items-center gap-4 p-5 rounded-2xl bg-[#007A3D] border-l-4 border-galaGreen hover:bg-green-100 transition-colors">
                             <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#007A3D] shrink-0 shadow-sm"><i class="fas fa-vial-circle-check"></i></div>
                             <span class="font-bold text-slate-700 text-sm sm:text-base">Zéro colorants artificiels agressifs</span>
                         </div>
@@ -210,7 +210,7 @@ $photos = $queryGallery->fetchAll();
                     <div class="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center text-[#007A3D] mb-8 mx-auto group-hover:bg-[#007A3D] group-hover:text-white transition-all">
                         <i class="fas fa-flask text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-4">Laboratoire Internne</h3>
+                    <h3 class="text-xl font-bold mb-4">Laboratoire Interne</h3>
                     <p class="text-slate-600 text-sm leading-relaxed">Analyses quotidiennes pour assurer une onctuosité et une conservation parfaite.</p>
                 </div>
             </div>
@@ -218,94 +218,103 @@ $photos = $queryGallery->fetchAll();
     </section>
 
   <section id="gamme" class="py-24 bg-slate-50">
-        <div class="max-w-7xl mx-auto px-5">
-            <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
-                <h2 class="text-3xl sm:text-4xl font-extrabold text-galaDark tracking-tight">Notre Gamme Complète</h2>
-                <p class="text-slate-600">Explorez nos différents conditionnements adaptés aux besoins des familles comme des professionnels de la restauration.</p>
-            </div>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                <?php foreach ($produits as $p): ?>
-                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition duration-300 flex flex-col justify-between group relative">
-                    
-                    <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
-                        <span class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse">
-                            Épuisé
-                        </span>
-                    <?php elseif (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
-                        <span class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10">
-                            PROMO
-                        </span>
-                    <?php endif; ?>
+    <div class="max-w-7xl mx-auto px-5">
+        <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+            <h2 class="text-3xl sm:text-4xl font-extrabold text-galaDark tracking-tight">Notre Gamme Complète</h2>
+            <p class="text-slate-600">Explorez nos différents conditionnements adaptés aux besoins des familles comme des professionnels de la restauration.</p>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <?php foreach ($produits as $p): ?>
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition duration-300 flex flex-col justify-between group relative">
+                
+                <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
+                    <span class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse">
+                        Épuisé
+                    </span>
+                <?php elseif (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
+                    <span class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10">
+                        PROMO
+                    </span>
+                <?php endif; ?>
 
-                    <div>
-                        <div class="aspect-square mb-6 overflow-hidden rounded-2xl bg-slate-50 flex items-center justify-center relative">
-                            <img src="assets/img/<?= htmlspecialchars($p['image_url']) ?>" alt="<?= htmlspecialchars($p['nom']) ?>" class="w-full h-full object-contain p-6 group-hover:scale-110 transition duration-500">
+                <div>
+                    <div class="aspect-square mb-6 overflow-hidden rounded-2xl bg-slate-50 flex items-center justify-center relative">
+                        <img src="assets/img/<?= htmlspecialchars($p['image_url']) ?>" alt="<?= htmlspecialchars($p['nom']) ?>" class="w-full h-full object-contain p-6 group-hover:scale-110 transition duration-500">
+                    </div>
+                    
+                    <div class="space-y-1">
+                        <h3 class="text-xl font-bold text-galaDark"><?= htmlspecialchars($p['nom']) ?></h3>
+                        <p class="text-galaGreen text-sm font-black tracking-wide uppercase"><?= htmlspecialchars($p['format']) ?></p>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-50 flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-xs text-slate-400 font-medium">Prix conseillé</span>
+                            <span class="text-xl font-black text-galaDark">
+                                <?= isset($p['prix']) && $p['prix'] > 0 ? number_format($p['prix'], 0, ',', ' ') . ' FCFA' : 'Prix sur demande'; ?>
+                            </span>
                         </div>
                         
-                        <div class="space-y-1">
-                            <h3 class="text-xl font-bold text-galaDark"><?= htmlspecialchars($p['nom']) ?></h3>
-                            <p class="text-galaGreen text-sm font-black tracking-wide uppercase"><?= htmlspecialchars($p['format']) ?></p>
-                        </div>
+                        <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
+                            <button disabled class="bg-slate-200 text-slate-400 text-sm font-bold px-4 py-2.5 rounded-xl cursor-not-allowed">
+                                Indisponible
+                            </button>
+                        <?php else: ?>
+                            <button onclick="toggleOrderSelector(<?= $p['id'] ?>)" class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition">
+                                Commander
+                            </button>
+                        <?php endif; ?>
                     </div>
 
-                    <div class="mt-6 pt-4 border-t border-slate-50 flex flex-col gap-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex flex-col">
-                                <span class="text-xs text-slate-400 font-medium">Prix conseillé</span>
-                                <span class="text-xl font-black text-galaDark">
-                                    <?= isset($p['prix']) && $p['prix'] > 0 ? number_format($p['prix'], 0, ',', ' ') . ' FCFA' : 'Prix sur demande'; ?>
-                                </span>
-                            </div>
-                            
-                            <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
-                                <button disabled class="bg-slate-200 text-slate-400 text-sm font-bold px-4 py-2.5 rounded-xl cursor-not-allowed">
-                                    Indisponible
-                                </button>
-                            <?php else: ?>
-                                <button onclick="toggleOrderSelector(<?= $p['id'] ?>)" class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition">
-                                    Commander
-                                </button>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if (!(isset($p['stock']) && $p['stock'] <= 0)): ?>
-                        <div id="selector-container-<?= $p['id'] ?>" data-stock="<?= $p['stock'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row gap-2 items-center justify-between transition-all">
+                    <?php if (!(isset($p['stock']) && $p['stock'] <= 0)): ?>
+                    <div id="selector-container-<?= $p['id'] ?>" data-stock="<?= $p['stock'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col gap-2 transition-all">
+                        <div class="flex flex-col sm:flex-row gap-2 items-center justify-between w-full">
                             <div class="flex items-center gap-2 w-full sm:w-auto">
-                             <div class="flex items-center bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-galaGreen transition overflow-hidden h-9 w-full sm:w-28">
-    <button type="button" onclick="decrementQuantity(<?= $p['id'] ?>)" class="px-2 text-slate-500 hover:bg-slate-100 h-full transition select-none">
-        <i class="fas fa-minus text-xs"></i>
-    </button>
-    
-    <input 
-        id="quantity-<?= $p['id'] ?>" 
-        type="number" 
-        value="1" 
-        min="1" 
-        class="w-full text-center font-bold text-sm text-slate-700 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-    >
-    
-    <button type="button" onclick="incrementQuantity(<?= $p['id'] ?>)" class="px-2 text-slate-500 hover:bg-slate-100 h-full transition select-none">
-        <i class="fas fa-plus text-xs"></i>
-    </button>
-</div>
+                                <div class="flex items-center bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-galaGreen transition overflow-hidden h-9 w-full sm:w-28">
+                                    <button type="button" onclick="decrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full transition select-none">
+                                        <i class="fas fa-minus text-xs"></i>
+                                    </button>
+                                    
+                                    <input 
+                                        id="quantity-<?= $p['id'] ?>" 
+                                        type="number" 
+                                        value="1" 
+                                        min="1" 
+                                        max="<?= $p['stock'] ?>"
+                                        oninput="validateInputStock(<?= $p['id'] ?>)"
+                                        class="w-full text-center font-bold text-sm text-slate-700 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    >
+                                    
+                                    <button type="button" onclick="incrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full transition select-none">
+                                        <i class="fas fa-plus text-xs"></i>
+                                    </button>
+                                </div>
                                 <select id="unit-<?= $p['id'] ?>" class="w-1/2 sm:w-24 p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-galaGreen outline-none">
                                     <option value="carton(s)">Carton(s)</option>
                                     <option value="boite(s)">Boîte(s)</option>
                                 </select>
                             </div>
-                            <button onclick="checkStockAndSubmit(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nom'])) ?>')" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-3 py-2.5 rounded-xl hover:bg-[#007A3D] transition whitespace-nowrap">
+                            
+                            <button onclick="checkStockAndSubmit(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nom'])) ?>')" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-[#005c2e] transition whitespace-nowrap">
                                 Valider
                             </button>
                         </div>
-                        <?php endif; ?>
+                        <p id="error-stock-<?= $p['id'] ?>" class="hidden text-[11px] text-red-600 font-bold mt-1 text-center sm:text-left">
+                            <i class="fas fa-exclamation-triangle"></i> Quantité max disponible : <?= $p['stock'] ?> unités.
+                        </p>
                     </div>
-
+                    <?php endif; ?>
                 </div>
-                <?php endforeach; ?>
+
             </div>
+            <?php endforeach; ?>
         </div>
-    </section>
+    </div>
+</section>
+
     <section id="galerie" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-5">
             <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -329,7 +338,6 @@ $photos = $queryGallery->fetchAll();
             </div>
         </div>
     </section>
-
     <section id="b2b" class="py-24 bg-white text-[#007A3D] overflow-hidden relative">
         <div class="absolute top-0 right-0 w-96 h-96 bg-[#007A3D]/10 rounded-full blur-[120px] -mr-48 -mt-48"></div>
         <div class="max-w-7xl mx-auto px-5 relative z-10">
@@ -384,9 +392,9 @@ $photos = $queryGallery->fetchAll();
         </div>
     </section>
 
-     <section id="contact" class="py-24 bg-white">
-        <div class="max-w-7xl mx-auto px-5">
-            <div class="bg-slate-50 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-2">
+    <section id="contact" class="py-24 bg-slate-50">
+    <div class="max-w-4xl mx-auto px-5">
+           <div class="bg-slate-50 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-2">
                 <div class="p-8 sm:p-12 md:p-20">
                     <h2 class="text-3xl md:text-4xl font-black mb-10 text-[#007A3D] uppercase tracking-tighter">Parlons ensemble</h2>
                     <div class="space-y-8">
@@ -404,32 +412,33 @@ $photos = $queryGallery->fetchAll();
                         </div>
                     </div>
                 </div>
-                <div class="bg-[#007A3D]/5 p-8 sm:p-12 md:p-20 flex flex-col justify-center">
-                    <form id="contactForm" class="space-y-5">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Votre Nom Complet</label>
-                                <input type="text" name="nom" placeholder="Ex: Jean Dupont" class="w-full p-4 rounded-xl border border-slate-100 bg-white focus:ring-2 focus:ring-[#007A3D] outline-none transition" required>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Téléphone</label>
-                                <input type="tel" name="tel" placeholder="Ex: 699000000" class="w-full p-4 rounded-xl border border-slate-100 bg-white focus:ring-2 focus:ring-[#007A3D] outline-none transition" required>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Votre Message</label>
-                            <textarea name="message" placeholder="Détaillez votre demande ici..." class="w-full p-4 rounded-xl border border-slate-100 bg-white focus:ring-2 focus:ring-[#007A3D] outline-none h-36 transition resize-none"></textarea>
-                        </div>
-                        
-                        <button type="submit" class="w-full bg-[#007A3D] text-white font-bold py-4 rounded-xl shadow-lg hover:bg-[#005a2d] transition duration-300 tracking-wide">
-                            <i class="fas fa-paper-plane mr-2 text-sm"></i> Envoyer le message
-                        </button>
-                    </form>
-                    <div id="responseMsg" class="mt-4 hidden p-4 rounded-xl text-center font-bold text-sm shadow-inner transition duration-300"></div>
+        <div class="bg-white p-10 md:p-14 rounded-[3rem] shadow-xl border border-slate-300">
+            <h2 class="text-3xl font-extrabold text-galaDark mb-8 text-center">Finaliser votre Commande / Nous Contacter</h2>
+            
+            <div id="contact-response" class="hidden mb-6 p-4 rounded-xl text-center font-bold"></div>
+
+            <form id="contactForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Nom complet *</label>
+                        <input type="text" name="nom" required class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Téléphone *</label>
+                        <input type="tel" name="tel" required class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Ex: 6xx xx xx xx">
+                    </div>
                 </div>
-            </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Votre Message / Détails de la commande</label>
+                    <textarea name="message" rows="5" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Votre texte ou message de commande automatique apparaîtra ici..."></textarea>
+                </div>
+                <button type="submit" class="w-full py-4 bg-[#007A3D] text-white rounded-2xl font-bold shadow-lg hover:bg-[#005c2e] transition uppercase tracking-wider text-sm">
+                    Envoyer le message
+                </button>
+            </form>
         </div>
-    </section>
+    </div>
+</section>
 
     <div class="bg-galaDark py-12">
         <div class="max-w-7xl mx-auto px-5 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
@@ -483,110 +492,17 @@ $photos = $queryGallery->fetchAll();
         </div>
     </div>
 
-    <script>
-    // Menu Mobile Toggle
+  
+
+  <script>
+    // Menu mobile toggle
     const menuBtn = document.getElementById('menu-btn');
     const mobileNav = document.getElementById('mobile-nav');
-    
-    menuBtn.addEventListener('click', () => {
-        mobileNav.classList.toggle('active');
-        const icon = menuBtn.querySelector('i');
-        icon.classList.toggle('fa-bars-staggered');
-        icon.classList.toggle('fa-xmark');
-    });
-
-    document.querySelectorAll('.mobile-link').forEach(link => {
-        link.addEventListener('click', () => {
-            mobileNav.classList.remove('active');
-            menuBtn.querySelector('i').className = 'fas fa-bars-staggered';
+    if(menuBtn && mobileNav) {
+        menuBtn.addEventListener('click', () => {
+            mobileNav.classList.toggle('active');
         });
-    });
-function checkStockAndSubmit(id, prodNom) {
-        // Récupération de la quantité choisie par le client
-        const quantitySelected = parseInt(document.getElementById('quantity-' + id).value);
-        
-        // Récupération du stock réel injecté dynamiquement depuis PHP
-        const container = document.getElementById('selector-container-' + id);
-        const currentStock = parseInt(container.getAttribute('data-stock'));
-
-        // Vérification si la demande dépasse le stock
-        if (quantitySelected > currentStock) {
-            alert("Désolé, notre stock pour '" + prodNom + "' est inférieur à votre demande.\n\nStock actuel disponible : " + currentStock + " pièces ou cartons.");
-            return false; // Bloque la validation
-        }
-
-        // Si tout est bon, on exécute votre fonction d'origine pour traiter la commande
-        if (typeof submitDirectOrder === "function") {
-            submitDirectOrder(id, prodNom);
-        }
     }
-    // Envoi asynchrone du formulaire (Contact)
-    document.getElementById('contactForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        const responseDiv = document.getElementById('responseMsg');
-
-        // Animation d'envoi
-        responseDiv.innerHTML = "<i class='fas fa-spinner animate-spin mr-2'></i> Envoi en cours...";
-        responseDiv.className = "mt-4 p-4 rounded-xl bg-blue-50 text-blue-700 text-center font-bold text-sm block";
-
-        fetch('traitement_contact.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            return response.text().then(text => {
-                return { status: response.status, text: text };
-            });
-        })
-        .then(res => {
-            responseDiv.innerHTML = res.text;
-            responseDiv.classList.remove('hidden');
-            
-            if (res.status === 200) {
-                responseDiv.className = "mt-4 p-4 rounded-xl bg-green-100 text-green-700 text-center font-bold text-sm";
-                this.reset();
-            } else {
-                responseDiv.className = "mt-4 p-4 rounded-xl bg-red-100 text-red-700 text-center font-bold text-sm";
-            }
-        })
-        .catch(error => {
-            responseDiv.innerHTML = "Une erreur réseau est survenue.";
-            responseDiv.className = "mt-4 p-4 rounded-xl bg-red-100 text-red-700 text-center font-bold text-sm";
-        });
-    });
-
-    // Gestion des Modales (Ouverture/Fermeture)
-    function toggleModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) {
-            modal.classList.toggle('hidden');
-            document.body.classList.toggle('overflow-hidden');
-        }
-    }
-function incrementQuantity(id) {
-    const input = document.getElementById('quantity-' + id);
-    if (input) {
-        input.value = parseInt(input.value) + 1;
-    }
-}
-
-function decrementQuantity(id) {
-    const input = document.getElementById('quantity-' + id);
-    if (input && parseInt(input.value) > 1) {
-        input.value = parseInt(input.value) - 1;
-    }
-}
-    // Fermeture des modales au clic à l'extérieur
-    window.addEventListener('click', (event) => {
-        if (event.target.classList.contains('bg-slate-900/60')) {
-            const openModal = document.querySelector('[id$="-modal"]:not(.hidden)');
-            if(openModal) {
-                openModal.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            }
-        }
-    });
 
     // Gestion du sélecteur de commande directe
     function toggleOrderSelector(id) {
@@ -596,28 +512,147 @@ function decrementQuantity(id) {
         }
     }
 
-    // Validation et traitement de la commande directe
-    function submitDirectOrder(id, productName) {
-        const quantity = document.getElementById('quantity-' + id).value;
-        const unit = document.getElementById('unit-' + id).value;
+    // Fonctions de contrôle des quantités pour le sélecteur (Boutons + et -)
+    function incrementQuantity(id) {
+        const input = document.getElementById('quantity-' + id);
+        const container = document.getElementById('selector-container-' + id);
+        const maxStock = parseInt(container.getAttribute('data-stock')) || 999;
+        let currentVal = parseInt(input.value) || 0;
+        if (currentVal < maxStock) {
+            input.value = currentVal + 1;
+            validateInputStock(id);
+        }
+    }
+
+    function decrementQuantity(id) {
+        const input = document.getElementById('quantity-' + id);
+        let currentVal = parseInt(input.value) || 1;
+        if (currentVal > 1) {
+            input.value = currentVal - 1;
+            validateInputStock(id);
+        }
+    }
+
+    // Permet la saisie manuelle fluide sans bloquer l'écriture
+    function validateInputStock(id) {
+        const input = document.getElementById('quantity-' + id);
+        const container = document.getElementById('selector-container-' + id);
+        const errorMsg = document.getElementById('error-stock-' + id);
+        const maxStock = parseInt(container.getAttribute('data-stock')) || 0;
         
-        // Pré-remplit automatiquement le message de la section Contact
-        const messageField = document.querySelector('textarea[name="message"]');
-        if (messageField) {
-            messageField.value = "Bonjour, je souhaite commander directement " + quantity + " " + unit + " de " + productName + ". Merci de me recontacter.";
+        if (input.value === "") {
+            if(errorMsg) errorMsg.classList.add('hidden');
+            return;
+        }
+
+        let val = parseInt(input.value);
+
+        if (val > maxStock) {
+            if(errorMsg) errorMsg.classList.remove('hidden');
+            input.value = maxStock;
+        } else {
+            if(errorMsg) errorMsg.classList.add('hidden');
+        }
+    }
+
+    // Sécurité au cas où l'utilisateur quitte le champ en le laissant vide
+    document.querySelectorAll("input[id^='quantity-']").forEach(input => {
+        input.addEventListener('blur', function() {
+            let val = parseInt(this.value);
+            if (isNaN(val) || val < 1) {
+                this.value = 1;
+            }
+        });
+    });
+
+    // ÉTAPE 1 : Le client clique sur "Valider" sous un produit de la gamme
+    function checkStockAndSubmit(id, productName) {
+        const quantityInput = document.getElementById('quantity-' + id);
+        let quantity = parseInt(quantityInput.value) || 1;
+        const unit = document.getElementById('unit-' + id).value;
+        const container = document.getElementById('selector-container-' + id);
+        const maxStock = parseInt(container.getAttribute('data-stock')) || 0;
+
+        if (quantity > maxStock) {
+            alert("Désolé, la quantité demandée dépasse le stock disponible.");
+            return false;
         }
         
-        // Fait défiler l'écran de manière fluide vers le formulaire de contact pour finaliser l'envoi
+        // 1. Écriture automatique dans la zone de message
+        const messageField = document.querySelector('textarea[name="message"]');
+        if (messageField) {
+            messageField.value = "Bonjour, je souhaite commander directement " + quantity + " " + unit + " de " + productName + ". Merci de me recontacter au plus vite pour valider les modalités.";
+        }
+        
+        // 2. Défilement fluide vers le formulaire de contact
         const contactSection = document.getElementById('contact');
         if (contactSection) {
             contactSection.scrollIntoView({ behavior: 'smooth' });
-            
-            // Focus visuel optionnel sur le premier champ pour inviter l'utilisateur à signer
             setTimeout(() => {
                 const nameInput = document.querySelector('input[name="nom"]');
                 if(nameInput) nameInput.focus();
             }, 800);
         }
+
+        // 3. Soustraction automatique immédiate du stock en BDD (Requête asynchrone vers l'administration)
+        // Note: l'URL pointe vers 'admin/products_manager.php' car votre fichier s'y trouve.
+        fetch('admin/products_manager.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                'ajax_decrement_id': id,
+                'qty_to_remove': quantity
+            })
+        })
+        .then(response => {
+            if (response.ok) {
+                const newStock = maxStock - quantity;
+                container.setAttribute('data-stock', newStock);
+                // Si le stock tombe à zéro, on actualisera l'affichage de la carte après validation du formulaire
+            }
+        })
+        .catch(error => console.error('Erreur lors de la mise à jour du stock :', error));
+    }
+
+    // ÉTAPE 2 : Traitement et Envoi réel du formulaire de contact en BDD via AJAX
+    const contactForm = document.getElementById('contactForm');
+    const responseDiv = document.getElementById('contact-response');
+
+    if (contactForm) {
+        contactForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // Empêche le rechargement brutal de la page
+
+            const formData = new FormData(this);
+
+            fetch('traitement_contact.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(async response => {
+                const text = await response.text();
+                responseDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+                
+                if (response.ok) {
+                    // Message de succès vert
+                    responseDiv.classList.add('bg-green-100', 'text-green-700');
+                    responseDiv.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ${text}`;
+                    contactForm.reset(); // Vide le formulaire
+                    
+                    // Optionnel : Rafraîchir après 2 secondes pour voir le changement des badges RUPTURE de stock si applicable
+                    setTimeout(() => { location.reload(); }, 2500);
+                } else {
+                    // Message d'erreur rouge
+                    responseDiv.classList.add('bg-red-100', 'text-red-700');
+                    responseDiv.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i> ${text}`;
+                }
+            })
+            .catch(error => {
+                responseDiv.classList.remove('hidden', 'bg-green-100', 'text-green-700');
+                responseDiv.classList.add('bg-red-100', 'text-red-700');
+                responseDiv.innerHTML = `<i class="fas fa-wifi mr-2"></i> Erreur réseau impossible de joindre le serveur.`;
+                console.error(error);
+            });
+        });
     }
 </script>
 </body>

@@ -6,6 +6,23 @@ require_once '../includes/db.php';
 $error = ""; $success = "";
 $current_page = basename($_SERVER['PHP_SELF']);
 
+// ==========================================
+// CONFIGURATION DE LA PAGINATION
+// ==========================================
+$items_per_page = 8; // Nombre maximum de photos par page
+$page = isset($_GET['p']) && (int)$_GET['p'] > 0 ? (int)$_GET['p'] : 1;
+$offset = ($page - 1) * $items_per_page;
+
+// Calcul du nombre total de photos
+$total_items = $pdo->query("SELECT COUNT(*) FROM gallery")->fetchColumn();
+$total_pages = ceil($total_items / $items_per_page);
+
+if ($page > $total_pages && $total_pages > 0) { 
+    $page = $total_pages; 
+    $offset = ($page - 1) * $items_per_page; 
+}
+// ==========================================
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['photo'])) {
     $titre = htmlspecialchars($_POST['titre']);
     $file_name = $_FILES['photo']['name'];
@@ -25,6 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['photo'])) {
             $stmt = $pdo->prepare("INSERT INTO gallery (titre, image_url) VALUES (?, ?)");
             $stmt->execute([$titre, $new_name]);
             $success = "Image ajoutée à la galerie avec succès !";
+            
+            // Re-calculer le total après insertion pour une pagination juste
+            $total_items = $pdo->query("SELECT COUNT(*) FROM gallery")->fetchColumn();
+            $total_pages = ceil($total_items / $items_per_page);
         } else {
             $error = "Échec du transfert sur le serveur.";
         }
@@ -33,7 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['photo'])) {
     }
 }
 
-$photos = $pdo->query("SELECT * FROM gallery ORDER BY id DESC")->fetchAll();
+// Récupération des photos pour la page actuelle uniquement
+$stmt = $pdo->prepare("SELECT * FROM gallery ORDER BY id DESC LIMIT :limit OFFSET :offset");
+$stmt->bindValue(':limit', $items_per_page, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+$photos = $stmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -41,7 +67,7 @@ $photos = $pdo->query("SELECT * FROM gallery ORDER BY id DESC")->fetchAll();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin - Galerie Médias</title>
- <script src="../assets/tailwind.js"></script>
+    <script src="../assets/tailwind.js"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a', galaGold: '#f8f9f8f1', } } } }
     </script>
@@ -55,25 +81,25 @@ $photos = $pdo->query("SELECT * FROM gallery ORDER BY id DESC")->fetchAll();
                 <h1 class="text-2xl font-black text-galaGreen">Gala<span class="text-[#E30613]"> Admin</span></h1>
                 <p class="text-xs font-bold text-slate-700/80">Espace Restreint</p>
             </div>
-            
-             <nav class="space-y-2">
-    <a href="messages.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'messages.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
-        <i class="fas fa-envelope w-5 <?= ($current_page == 'messages.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
-        <span>Messages</span>
-    </a>
-    
-    <a href="products_manager.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'products_manager.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
-        <i class="fas fa-box w-5 <?= ($current_page == 'products_manager.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
-        <span>Produits</span>
-    </a>
-    
-    <a href="gallery.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'gallery.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
-        <i class="fas fa-images w-5 <?= ($current_page == 'gallery.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
-        <span>Galerie</span>
-    </a>
-</nav>
+            <nav class="space-y-2">
+                <a href="messages.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'messages.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+                    <i class="fas fa-envelope w-5 <?= ($current_page == 'messages.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+                    <span>Messages</span>
+                </a>
+                <a href="products_manager.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'products_manager.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+                    <i class="fas fa-box w-5 <?= ($current_page == 'products_manager.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+                    <span>Produits</span>
+                </a>
+                <a href="gallery.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'gallery.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5' ?>">
+                    <i class="fas fa-images w-5 <?= ($current_page == 'gallery.php') ? 'text-white' : 'text-slate-600' ?>"></i> 
+                    <span>Galerie</span>
+                </a>
+                </a>
+                <a href="http://localhost/sitedynamique/index.php#accueil" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'http://localhost/sitedynamique/index.php#accueil') ? 'bg-galaGreen text-white shadow-md' : 'text-[#E30613] hover:bg-black/5' ?>">
+                    <i class="fas fa-images w-5"></i> <span>Consulter le site</span>
+                </a>
+            </nav>
         </div>
-        
         <a href="logout.php" class="flex items-center space-x-3 p-3 rounded-xl text-rose-700 hover:bg-rose-700/10 transition font-bold mt-auto">
             <i class="fas fa-sign-out-alt w-5"></i> <span>Déconnexion</span>
         </a>
@@ -83,56 +109,129 @@ $photos = $pdo->query("SELECT * FROM gallery ORDER BY id DESC")->fetchAll();
         <h1 class="text-lg font-black text-galaGreen">Gala<span class="text-[#E30613]"> Admin</span></h1>
         <div class="flex space-x-1 items-center">
             <a href="messages.php" class="p-2 text-xl text-slate-700"><i class="fas fa-envelope"></i></a>
-            
-            <a href="products_manager.php" class="p-2 text-xl text-white bg-galaDark rounded-xl px-3"><i class="fas fa-box"></i></a>
-            
-            <a href="gallery.php" class="p-2 text-xl text-slate-700"><i class="fas fa-images"></i></a>
+            <a href="products_manager.php" class="p-2 text-xl text-slate-700"><i class="fas fa-box"></i></a>
+            <a href="gallery.php" class="p-2 text-xl text-white bg-galaDark rounded-xl px-3"><i class="fas fa-images"></i></a>
             <a href="logout.php" class="p-2 text-xl text-rose-700"><i class="fas fa-sign-out-alt"></i></a>
         </div>
     </div>
   
-    <main class="flex-1 p-4 md:p-10 w-full overflow-x-hidden">
-        <div class="mb-8">
-            <h2 class="text-2xl md:text-3xl font-black text-slate-800">Galerie photo dynamique</h2>
-            <p class="text-slate-400 text-sm">Gérez les médias affichés dans le carrousel de la page d'accueil.</p>
-        </div>
-
-        <?php if($success): ?>
-            <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-green-100"><?= $success ?></div>
-        <?php endif; ?>
-        <?php if($error): ?>
-            <div class="bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-rose-100"><?= $error ?></div>
-        <?php endif; ?>
-
-        <div class="bg-white p-6 rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 mb-10">
-            <form method="POST" enctype="multipart/form-data" class="flex flex-col md:flex-row items-end gap-4">
-                <div class="w-full md:flex-1">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Légende / Titre</label>
-                    <input type="text" name="titre" placeholder="Ex: Notre équipe de production" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 transition" required>
+    <main class="flex-1 p-4 md:p-10 w-full overflow-x-hidden flex flex-col justify-between">
+        <div>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-2">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Galerie photo dynamique</h2>
+                    <p class="text-slate-400 text-sm mt-0.5">Gérez les médias affichés dans le carrousel de la page d'accueil.</p>
                 </div>
-                <div class="w-full md:w-auto">
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Fichier Média</label>
-                    <input type="file" name="photo" class="w-full p-2 bg-slate-50 rounded-xl border border-dashed border-slate-200" required>
-                </div>
-                <button type="submit" class="bg-galaGreen hover:bg-galaDark text-white px-6 py-3 rounded-xl font-bold transition shadow-md w-full md:w-auto h-[46px]">
-                    Mettre en ligne
-                </button>
-            </form>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            <?php foreach ($photos as $p): ?>
-            <div class="relative group h-44 bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
-                <img src="../assets/img/gallery/<?= htmlspecialchars($p['image_url']) ?>" class="w-full h-full object-cover">
-                <div class="absolute inset-0 bg-galaDark/80 opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col justify-between p-4 text-center">
-                    <p class="text-white text-xs font-bold truncate"><?= htmlspecialchars($p['titre']) ?></p>
-                    <a href="delete_photo.php?id=<?= $p['id'] ?>" onclick="return confirm('Confirmer le retrait immédiat de ce média ?');" class="text-white bg-rose-600 hover:bg-rose-700 h-9 w-9 rounded-full flex items-center justify-center mx-auto shadow-md transition">
-                        <i class="fas fa-trash-alt text-sm"></i>
-                    </a>
-                </div>
+                <span class="bg-galaGreen/10 text-galaGreen px-4 py-1.5 rounded-xl text-xs font-black border border-galaGreen/10 uppercase tracking-wider">
+                    <?= $total_items ?> Média(s)
+                </span>
             </div>
-            <?php endforeach; ?>
+
+            <?php if($success): ?>
+                <div class="bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-emerald-100/50 flex items-center space-x-3 shadow-sm">
+                    <i class="fas fa-check-circle text-base text-emerald-500"></i>
+                    <span><?= $success ?></span>
+                </div>
+            <?php endif; ?>
+            <?php if($error): ?>
+                <div class="bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-rose-100/50 flex items-center space-x-3 shadow-sm">
+                    <i class="fas fa-exclamation-circle text-base text-rose-500"></i>
+                    <span><?= $error ?></span>
+                </div>
+            <?php endif; ?>
+
+            <div class="bg-white p-6 rounded-2xl md:rounded-[2rem] shadow-sm border border-slate-100 mb-10 transition-all hover:shadow-md">
+                <form method="POST" enctype="multipart/form-data" class="flex flex-col lg:flex-row items-end gap-5">
+                    <div class="w-full lg:flex-1">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Légende / Titre du média</label>
+                        <input type="text" name="titre" placeholder="Ex: Notre équipe de production..." class="w-full p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl outline-none focus:ring-2 focus:ring-galaGreen/20 focus:border-galaGreen bg-white transition font-medium" required>
+                    </div>
+                    
+                    <div class="w-full lg:max-w-xs relative">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Fichier Média</label>
+                        <div class="relative group/file cursor-pointer">
+                            <input type="file" name="photo" id="photoInput" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer" required onchange="updateFileName(this)">
+                            <div class="w-full p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 group-hover/file:bg-slate-100/70 group-hover/file:border-galaGreen transition flex items-center justify-center space-x-2 text-sm font-semibold h-[50px]">
+                                <i class="fas fa-cloud-upload-alt text-galaGreen group-hover/file:scale-110 transition duration-300"></i>
+                                <span id="fileLabel" class="truncate max-w-[180px]">Choisir une image</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="bg-galaGreen hover:bg-galaDark text-white px-8 py-3.5 rounded-xl font-black transition-all duration-300 shadow-md hover:shadow-lg active:scale-95 w-full lg:w-auto h-[50px] flex items-center justify-center space-x-2 text-sm tracking-wide">
+                        <i class="fas fa-paper-plane text-xs"></i> <span>Mettre en ligne</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-10">
+                <?php if (empty($photos)): ?>
+                    <div class="col-span-full bg-white p-16 text-center rounded-2xl border border-slate-100 font-semibold text-slate-400 shadow-sm">
+                        <i class="fas fa-images text-3xl mb-3 text-slate-300 block"></i>
+                        Aucune photo présente dans la galerie.
+                    </div>
+                <?php endif; ?>
+
+                <?php foreach ($photos as $p): ?>
+                <div class="relative group h-52 bg-slate-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-slate-200/60 transition-all duration-500">
+                    <img src="../assets/img/gallery/<?= htmlspecialchars($p['image_url']) ?>" class="w-full h-full object-contain transition-transform duration-700 ease-out group-hover:scale-110">
+                    
+                    <div class="absolute inset-0 bg-gradient-to-t from-galaDark/95 via-galaDark/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col justify-end p-5">
+                        <div class="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 ease-out">
+                            <p class="text-white text-sm font-black mb-4 truncate text-left tracking-wide drop-shadow-sm"><?= htmlspecialchars($p['titre']) ?></p>
+                            <a href="delete_photo.php?id=<?= $p['id'] ?>" onclick="return confirm('Confirmer le retrait immédiat de ce média ?');" class="text-white bg-rose-600 hover:bg-rose-500 h-10 w-full rounded-xl flex items-center justify-center space-x-2 shadow-md transition-all duration-200 active:scale-95 font-bold text-xs uppercase tracking-wider">
+                                <i class="fas fa-trash-alt text-xs"></i> <span>Supprimer</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
         </div>
+
+        <?php if ($total_pages > 1): ?>
+        <div class="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Page <?= $page ?> sur <?= $total_pages ?>
+            </span>
+            
+            <div class="flex items-center space-x-1">
+                <a href="?p=<?= $page - 1 ?>" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold transition hover:bg-slate-50 flex items-center <?= $page <= 1 ? 'pointer-events-none opacity-40' : '' ?>">
+                    <i class="fas fa-chevron-left mr-1"></i> Précédent
+                </a>
+
+                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                    <?php if ($i == $page): ?>
+                        <span class="px-3 py-1.5 rounded-xl bg-galaGreen text-white text-xs font-black shadow-sm border border-galaGreen select-none">
+                            <?= $i ?>
+                        </span>
+                    <?php else: ?>
+                        <a href="?p=<?= $i ?>" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold transition hover:bg-slate-50">
+                            <?= $i ?>
+                        </a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+
+                <a href="?p=<?= $page + 1 ?>" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-xs font-bold transition hover:bg-slate-50 flex items-center <?= $page >= $total_pages ? 'pointer-events-none opacity-40' : '' ?>">
+                    Suivant <i class="fas fa-chevron-right ml-1"></i>
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
+
     </main>
+
+    <script>
+    function updateFileName(input) {
+        const label = document.getElementById('fileLabel');
+        if (input.files && input.files.length > 0) {
+            label.textContent = input.files[0].name;
+            label.classList.remove('text-slate-500');
+            label.classList.add('text-galaGreen');
+        } else {
+            label.textContent = "Choisir une image";
+        }
+    }
+    </script>
 </body>
 </html>
