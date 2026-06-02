@@ -1,12 +1,29 @@
 <?php 
 session_start(); // Nécessaire pour détecter si l'admin est connecté
+
+// 1. ON INCLUT D'ABORD LA BASE DE DONNÉES (Crée la variable $pdo)
 require_once 'includes/db.php';
 
-// 1. Récupération des produits avec gestion du prix et du stock
+// 2. SCRIPT POUR L'ACTUALISATION AUTOMATIQUE EN TEMPS RÉEL (AJAX)
+if (isset($_GET['api_live_update'])) {
+    header('Content-Type: application/json');
+    
+    // Récupérer les produits
+    $qProducts = $pdo->query("SELECT id, nom, format, prix, stock, image_url, en_solde FROM products ORDER BY id DESC");
+    $allProducts = $qProducts->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Récupérer la galerie
+    $qGallery = $pdo->query("SELECT id, titre, image_url FROM gallery ORDER BY created_at DESC LIMIT 8");
+    $allGallery = $qGallery->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['products' => $allProducts, 'gallery' => $allGallery]);
+    exit;
+}
+
+// 3. CHARGEMENT INITIAL DE LA PAGE (REQUÊTES TRADITIONNELLES)
 $queryProducts = $pdo->query("SELECT * FROM products ORDER BY id DESC");
 $produits = $queryProducts->fetchAll();
 
-// 2. Récupération des photos de la galerie dynamique
 $queryGallery = $pdo->query("SELECT * FROM gallery ORDER BY created_at DESC LIMIT 8");
 $photos = $queryGallery->fetchAll();
 ?>
@@ -226,14 +243,14 @@ $photos = $queryGallery->fetchAll();
         
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             <?php foreach ($produits as $p): ?>
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition duration-300 flex flex-col justify-between group relative">
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition duration-300 flex flex-col justify-between group relative" id="product-card-<?= $p['id']; ?>">
                 
-                <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
-                    <span class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse">
-                        Épuisé
-                    </span>
-                <?php elseif (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
-                    <span class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10">
+                <span id="badge-rupture-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse <?= (isset($p['stock']) && $p['stock'] <= 0) ? '' : 'hidden'; ?>">
+                    Épuisé
+                </span>
+
+                <?php if (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
+                    <span id="badge-promo-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'hidden' : ''; ?>">
                         PROMO
                     </span>
                 <?php endif; ?>
@@ -246,6 +263,8 @@ $photos = $queryGallery->fetchAll();
                     <div class="space-y-1">
                         <h3 class="text-xl font-bold text-galaDark"><?= htmlspecialchars($p['nom']) ?></h3>
                         <p class="text-galaGreen text-sm font-black tracking-wide uppercase"><?= htmlspecialchars($p['format']) ?></p>
+                        
+                        
                     </div>
                 </div>
 
@@ -258,18 +277,14 @@ $photos = $queryGallery->fetchAll();
                             </span>
                         </div>
                         
-                        <?php if (isset($p['stock']) && $p['stock'] <= 0): ?>
-                            <button disabled class="bg-slate-200 text-slate-400 text-sm font-bold px-4 py-2.5 rounded-xl cursor-not-allowed">
-                                Indisponible
-                            </button>
-                        <?php else: ?>
-                            <button onclick="toggleOrderSelector(<?= $p['id'] ?>)" class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition">
-                                Commander
-                            </button>
-                        <?php endif; ?>
+                        <button id="btn-order-<?= $p['id']; ?>" 
+                                onclick="toggleOrderSelector(<?= $p['id'] ?>)" 
+                                class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50' : ''; ?>"
+                                <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'disabled' : ''; ?>>
+                            <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'Indisponible' : 'Commander'; ?>
+                        </button>
                     </div>
 
-                    <?php if (!(isset($p['stock']) && $p['stock'] <= 0)): ?>
                     <div id="selector-container-<?= $p['id'] ?>" data-stock="<?= $p['stock'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col gap-2 transition-all">
                         <div class="flex flex-col sm:flex-row gap-2 items-center justify-between w-full">
                             <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -303,10 +318,9 @@ $photos = $queryGallery->fetchAll();
                             </button>
                         </div>
                         <p id="error-stock-<?= $p['id'] ?>" class="hidden text-[11px] text-red-600 font-bold mt-1 text-center sm:text-left">
-                            <i class="fas fa-exclamation-triangle"></i> Quantité max disponible : <?= $p['stock'] ?> unités.
+                            <i class="fas fa-exclamation-triangle"></i> Quantité max disponible : <span id="error-stock-qty-<?= $p['id'] ?>"><?= $p['stock'] ?></span> unités.
                         </p>
                     </div>
-                    <?php endif; ?>
                 </div>
 
             </div>
@@ -322,7 +336,7 @@ $photos = $queryGallery->fetchAll();
                 <p class="text-slate-600">Immersion au cœur de notre univers de production et de nos événements de marque.</p>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+           <div id="live-gallery-container" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <?php if (empty($photos)): ?>
                     <p class="text-slate-400 italic col-span-full text-center py-6">Aucune image disponible dans la galerie.</p>
                 <?php else: ?>
@@ -364,7 +378,7 @@ $photos = $queryGallery->fetchAll();
                         </li>
                     </ul>
                     <div class="pt-6 text-center md:text-left">
-                        <a href="https://wa.me/237699105753" class="inline-flex items-center px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
+                        <a href="https://wa.me/237656876238" class="inline-flex items-center px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
                             <i class="fab fa-whatsapp mr-3 text-2xl"></i> Devenir Grossiste
                         </a>
                     </div>
@@ -495,6 +509,7 @@ $photos = $queryGallery->fetchAll();
   
 
   <script>
+
     // Menu mobile toggle
     const menuBtn = document.getElementById('menu-btn');
     const mobileNav = document.getElementById('mobile-nav');
@@ -503,7 +518,29 @@ $photos = $queryGallery->fetchAll();
             mobileNav.classList.toggle('active');
         });
     }
+function toggleModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
 
+    // Basculer l'affichage de la modale
+    modal.classList.toggle('hidden');
+
+    // Optionnel : Bloquer le défilement du body en arrière-plan quand la modale est ouverte
+    if (!modal.classList.contains('hidden')) {
+        document.body.classList.add('overflow-hidden');
+    } else {
+        document.body.classList.remove('overflow-hidden');
+    }
+}
+
+// Fermer la modale si l'utilisateur clique à l'extérieur de la boîte blanche
+window.addEventListener('click', function(e) {
+    const legalModal = document.getElementById('legal-modal');
+    const privacyModal = document.getElementById('privacy-modal');
+
+    if (e.target === legalModal) toggleModal('legal-modal');
+    if (e.target === privacyModal) toggleModal('privacy-modal');
+});
     // Gestion du sélecteur de commande directe
     function toggleOrderSelector(id) {
         const container = document.getElementById('selector-container-' + id);
@@ -653,6 +690,7 @@ $photos = $queryGallery->fetchAll();
                 console.error(error);
             });
         });
+        
     }
 </script>
 </body>

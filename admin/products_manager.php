@@ -2,6 +2,14 @@
 session_start();
 if (!isset($_SESSION['admin_logged'])) { header('Location: login.php'); exit; }
 require_once '../includes/db.php';
+// --- AJOUT POUR BACKOFFICE LIVE UPDATE ---
+if (isset($_GET['api_admin_stock'])) {
+    header('Content-Type: application/json');
+    $stmt = $pdo->query("SELECT id, stock FROM products");
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    exit;
+}
+// -----------------------------------------
 // Interception AJAX pour la diminution automatique du stock
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax_decrement_id'])) {
     $prodId = (int)$_POST['ajax_decrement_id'];
@@ -141,7 +149,7 @@ $products = $stmt_products->fetchAll();
                 </a>
                 </a>
                 <a href="http://localhost/sitedynamique/index.php#accueil" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'http://localhost/sitedynamique/index.php#accueil') ? 'bg-galaGreen text-white shadow-md' : 'text-[#E30613] hover:bg-black/5' ?>">
-                    <i class="fas fa-images w-5"></i> <span>Consulter le site</span>
+                    <i class="fas fa-globe w-5"></i> <span>Consulter le site</span>
                 </a>
             </nav>
         </div>
@@ -271,7 +279,9 @@ $products = $stmt_products->fetchAll();
                         <tbody class="divide-y divide-slate-100">
                             <?php if(empty($products)): ?>
                             <tr>
-                                <td colspan="7" class="p-12 text-center text-slate-400 font-medium">Aucun produit trouvé sur cette page.</td>
+                                <<td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">
+    <span id="admin-stock-<?= $product['id'] ?>"><?= $product['stock'] ?></span> unités
+</td>
                             </tr>
                             <?php else: ?>
                                 <?php foreach ($products as $index => $p): ?>
@@ -384,7 +394,36 @@ $products = $stmt_products->fetchAll();
 
     // Redirection vers le script PHP de traitement avec les paramètres de la commande
     window.location.href = `process_order.php?id=${id}&qty=${qtyRequested}&unit=${encodeURIComponent(unitChosen)}`;
+
 }
+function checkIncomingClientOrders() {
+    fetch('products_manager.php?api_admin_stock=1')
+    .then(response => response.json())
+    .then(products => {
+        products.forEach(p => {
+            const adminStockSpan = document.getElementById('admin-stock-' + p.id);
+            if (adminStockSpan) {
+                const oldStock = parseInt(adminStockSpan.textContent);
+                const newStock = parseInt(p.stock);
+                
+                if (oldStock !== newStock) {
+                    // Mettre à jour visuellement le stock
+                    adminStockSpan.textContent = newStock;
+                    
+                    // Optionnel : Ajouter un petit effet visuel flash ambré/jaune pour signaler le changement
+                    adminStockSpan.parentElement.classList.add('bg-amber-100', 'transition-colors', 'duration-500');
+                    setTimeout(() => {
+                        adminStockSpan.parentElement.classList.remove('bg-amber-100');
+                    }, 2000);
+                }
+            }
+        });
+    })
+    .catch(err => console.error("Erreur lors de la synchronisation des stocks :", err));
+}
+
+// Vérifier les nouvelles commandes toutes les 4 secondes
+setInterval(checkIncomingClientOrders, 4000);
     </script>
 </body>
 </html>

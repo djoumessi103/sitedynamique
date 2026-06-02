@@ -96,7 +96,7 @@ $photos = $stmt->fetchAll();
                 </a>
                 </a>
                 <a href="http://localhost/sitedynamique/index.php#accueil" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'http://localhost/sitedynamique/index.php#accueil') ? 'bg-galaGreen text-white shadow-md' : 'text-[#E30613] hover:bg-black/5' ?>">
-                    <i class="fas fa-images w-5"></i> <span>Consulter le site</span>
+                    <i class="fas fa-globe w-5"></i> <span>Consulter le site</span>
                 </a>
             </nav>
         </div>

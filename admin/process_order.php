@@ -1,60 +1,65 @@
 <?php
 session_start();
-// Inclusion de votre fichier de connexion (adaptez le chemin si nécessaire)
-require_once 'includes/db.php'; 
+require_once 'includes/db.php';
 
-// 1. Vérification des paramètres reçus dans l'URL
-if (!isset($_GET['id']) || !isset($_GET['qty']) || !isset($_GET['unit'])) {
-    die("Paramètres de commande manquants.");
-}
+// On s'assure que la requête arrive bien en POST et avec les paramètres nécessaires
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Récupération et sécurisation des données reçues
+    $productId = isset($_POST['product_id']) ? (int)$_POST['product_id'] : 0;
+    $qtyOrder = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 0;
 
-$id_produit = (int)$GET['id'];
-$quantite = (int)$GET['qty'];
-$unite = htmlspecialchars($_GET['unit']);
-
-if ($id_produit <= 0 || $quantite <= 0) {
-    die("Données de commande invalides.");
-}
-
-try {
-    // 2. Début de la transaction pour sécuriser l'opération
-    $pdo->beginTransaction();
-
-    // 3. Requête SQL atomique : décrémente SEULEMENT si le stock est suffisant
-    $stmt = $pdo->prepare("
-        UPDATE products 
-        SET stock = stock - :quantite 
-        WHERE id = :id AND stock >= :quantite
-    ");
-    
-    $stmt->execute([
-        ':quantite' => $quantite,
-        ':id'       => $id_produit
-    ]);
-
-    // 4. Vérification si la mise à jour a réussi
-    if ($stmt->rowCount() === 0) {
-        // Le stock a probablement changé entre-temps ou le produit n'existe pas
-        throw new Exception("Le stock disponible est insuffisant pour valider votre commande.");
+    if ($productId <= 0 || $qtyOrder <= 0) {
+        http_response_code(400);
+        echo json_encode(["error" => "Données de commande invalides."]);
+        exit;
     }
 
-    // [OPTIONNEL] C'est ici que vous pouvez insérer un INSERT INTO pour enregistrer la commande dans une table "orders" si vous en possédez une.
+    try {
+        // 1. Vérifier d'abord le stock actuel en Base de données
+        $stmt = $pdo->prepare("SELECT stock, nom FROM products WHERE id = ?");
+        $stmt->execute([$productId]);
+        $product = $stmt->fetch();
 
-    // Validation définitive de la transaction
-    $pdo->commit();
+        if (!$product) {
+            http_response_code(440);
+            echo json_encode(["error" => "Produit introuvable."]);
+            exit;
+        }
 
-    // 5. Message de succès et redirection vers le catalogue
-    echo "<script>
-            alert('Votre commande de $quantite $unite a bien été prise en compte ! Le stock a été mis à jour.');
-            window.location.href = 'index.php'; // Remplacez par le nom de votre page catalogue
-          </script>";
+        $currentStock = (int)$product['stock'];
 
-} catch (Exception $e) {
-    // Annulation des modifications en cas d'erreur
-    $pdo->rollBack();
-    echo "<script>
-            alert('Erreur : " . addslashes($e->getMessage()) . "');
-            window.location.href = 'index.php';
-          </script>";
+        if ($qtyOrder > $currentStock) {
+            http_response_code(400);
+            echo json_encode([
+                "error" => "Stock insuffisant pour le produit " . $product['nom'] . ". Stock disponible : " . $currentStock
+            ]);
+            exit;
+        }
+
+        // 2. Décrémenter le stock dans la base de données
+        $newStock = $currentStock - $qtyOrder;
+        $updateStmt = $pdo->prepare("UPDATE products SET stock = ? WHERE id = ?");
+        $updateStmt->execute([$newStock, $productId]);
+
+        // 3. Optionnel : Vous pouvez ici insérer la commande dans une table `commandes` si nécessaire
+
+        // Renvoi de la réponse de succès avec le nouveau stock restant
+        header('Content-Type: application/json');
+        echo json_encode([
+            "success" => true,
+            "message" => "Commande validée avec succès !",
+            "new_stock" => $newStock,
+            "product_id" => $productId
+        ]);
+        exit;
+
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(["error" => "Erreur technique : " . $e->getMessage()]);
+        exit;
+    }
+} else {
+    http_response_code(403);
+    echo json_encode(["error" => "Accès refusé."]);
+    exit;
 }
-?>
