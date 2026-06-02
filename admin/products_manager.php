@@ -177,12 +177,17 @@ $products = $stmt_products->fetchAll();
             <p class="text-slate-500 text-sm mt-1">Ajoutez, modifiez ou retirez des articles de la vitrine en temps réel.</p>
         </div>
 
-        <?php if($success): ?>
-            <div class="bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-emerald-200/60 flex items-center gap-3 shadow-sm animate-fade-in">
-                <i class="fas fa-check-circle text-lg text-emerald-500"></i>
-                <span><?= $success ?></span>
-            </div>
-        <?php endif; ?>
+       <?php if (!empty($success)): ?>
+    <div class="admin-alert bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 border border-emerald-100 text-center font-semibold shadow-sm transition-all duration-500">
+        <?= $success ?>
+    </div>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+    <div class="admin-alert bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 border border-rose-100 text-center font-semibold shadow-sm transition-all duration-500">
+        <?= $error ?>
+    </div>
+<?php endif; ?>
 
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 items-start">
             
@@ -424,6 +429,23 @@ function checkIncomingClientOrders() {
 
 // Vérifier les nouvelles commandes toutes les 4 secondes
 setInterval(checkIncomingClientOrders, 4000);
+document.addEventListener("DOMContentLoaded", function() {
+    // Sélectionner toutes les alertes ayant la classe 'admin-alert'
+    const alerts = document.querySelectorAll('.admin-alert');
+    
+    alerts.forEach(function(alert) {
+        // Disparition après 4 secondes (4000 millisecondes)
+        setTimeout(function() {
+            // Animation de fondu fluide avec Tailwind
+            alert.classList.add('opacity-0', 'scale-95');
+            
+            // Suppression définitive de l'élément du design après l'animation (500ms)
+            setTimeout(function() {
+                alert.remove();
+            }, 500);
+        }, 4000);
+    });
+});
     </script>
 </body>
 </html>

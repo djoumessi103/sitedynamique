@@ -127,18 +127,17 @@ $photos = $stmt->fetchAll();
                 </span>
             </div>
 
-            <?php if($success): ?>
-                <div class="bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-emerald-100/50 flex items-center space-x-3 shadow-sm">
-                    <i class="fas fa-check-circle text-base text-emerald-500"></i>
-                    <span><?= $success ?></span>
-                </div>
-            <?php endif; ?>
-            <?php if($error): ?>
-                <div class="bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 text-sm font-semibold border border-rose-100/50 flex items-center space-x-3 shadow-sm">
-                    <i class="fas fa-exclamation-circle text-base text-rose-500"></i>
-                    <span><?= $error ?></span>
-                </div>
-            <?php endif; ?>
+          <?php if (!empty($success)): ?>
+    <div class="auto-dismiss-alert bg-emerald-50 text-emerald-700 p-4 rounded-xl mb-6 border border-emerald-100 text-center font-semibold shadow-sm transition-all duration-500 transform ease-in-out">
+        <i class="fas fa-check-circle mr-2"></i> <?= $success ?>
+    </div>
+<?php endif; ?>
+
+<?php if (!empty($error)): ?>
+    <div class="auto-dismiss-alert bg-rose-50 text-rose-700 p-4 rounded-xl mb-6 border border-rose-100 text-center font-semibold shadow-sm transition-all duration-500 transform ease-in-out">
+        <i class="fas fa-exclamation-circle mr-2"></i> <?= $error ?>
+    </div>
+<?php endif; ?>
 
             <div class="bg-white p-6 rounded-2xl md:rounded-[2rem] shadow-sm border border-slate-100 mb-10 transition-all hover:shadow-md">
                 <form method="POST" enctype="multipart/form-data" class="flex flex-col lg:flex-row items-end gap-5">
@@ -231,6 +230,56 @@ $photos = $stmt->fetchAll();
         } else {
             label.textContent = "Choisir une image";
         }
+        document.addEventListener("DOMContentLoaded", function() {
+    // On sélectionne toutes les alertes ayant la classe 'auto-dismiss-alert'
+    const alerts = document.querySelectorAll('.auto-dismiss-alert');
+    
+    alerts.forEach(function(alert) {
+        // Le message reste visible pendant 4000 millisecondes (4 secondes)
+        setTimeout(function() {
+            
+            // Étape A : Animation Tailwind de fondu (opacité à 0) et léger rétrécissement (scale)
+            alert.classList.add('opacity-0', 'scale-95');
+            
+            // Étape B : Supprimer définitivement l'élément du DOM après la fin de l'animation (500ms)
+            setTimeout(function() {
+                alert.remove();
+            }, 500);
+
+        }, 4000); 
+    });
+});
+.then(async response => {
+    const text = await response.text();
+    responseDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'opacity-0');
+    responseDiv.classList.add('transition-all', 'duration-500'); // Pour garantir une transition fluide
+    
+    if (response.ok) {
+        // Message de succès vert
+        responseDiv.classList.add('bg-green-100', 'text-green-700');
+        responseDiv.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ${text}`;
+        contactForm.reset(); // Vide le formulaire
+        
+        // --- RENDRE LE MESSAGE ÉPHÉMÈRE ---
+        setTimeout(() => {
+            responseDiv.classList.add('opacity-0'); // Effet de fondu
+            setTimeout(() => {
+                responseDiv.classList.add('hidden'); // Cache complètement
+            }, 500);
+        }, 4000); // Reste visible 4 secondes
+        
+    } else {
+        // Message d'erreur rouge
+        responseDiv.classList.add('bg-red-100', 'text-red-700');
+        responseDiv.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i> ${text}`;
+        
+        // --- RENDRE L'ERREUR ÉPHÉMÈRE ÉGALEMENT (Optionnel) ---
+        setTimeout(() => {
+            responseDiv.classList.add('opacity-0');
+            setTimeout(() => { responseDiv.classList.add('hidden'); }, 500);
+        }, 5000); // Laisse l'erreur 5 secondes pour donner le temps de lire
+    }
+})
     }
     </script>
 </body>
