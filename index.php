@@ -95,7 +95,36 @@ $photos = $queryGallery->fetchAll();
     </style>
 </head>
 <body class="font-sans antialiased text-slate-900 overflow-x-hidden">
+ <!-- Écran de Sécurité Ludique -->
+<div id="game-shield" class="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-xl p-4 transition-all duration-700">
+    <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full border border-slate-100">
+        <h2 class="text-2xl font-black text-slate-800 mb-2">Vérification humaine</h2>
+        <p class="text-slate-500 text-sm mb-6">Cliquez sur le logo <span class="font-bold text-galaDark">Gala</span> pour entrer.</p>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <button onclick="failGame()" class="p-6 bg-slate-100 rounded-3xl hover:bg-slate-200 transition"><i class="fas fa-box-open text-3xl text-slate-400"></i></button>
+            <button onclick="winGame(this)" class="p-6 bg-red-50 rounded-3xl hover:bg-red-100 transition animate-pulse-gala flex items-center justify-center">
+                <div class="w-12 h-12 bg-galaDark rounded-lg flex items-center justify-center text-white font-bold shadow-lg text-lg">G</div>
+            </button>
+            <button onclick="failGame()" class="p-6 bg-slate-100 rounded-3xl hover:bg-slate-200 transition"><i class="fas fa-truck text-3xl text-slate-400"></i></button>
+            <button onclick="failGame()" class="p-6 bg-slate-100 rounded-3xl hover:bg-slate-200 transition"><i class="fas fa-utensils text-3xl text-slate-400"></i></button>
+        </div>
+        <p id="game-msg" class="text-red-500 font-bold text-sm hidden">Erreur ! Cliquez sur le logo Gala.</p>
+    </div>
+</div>
 
+<!-- Bandeau Cookies Moderne -->
+<div id="cookie-banner" class="fixed bottom-0 left-0 right-0 z-[50] p-4 hidden">
+    <div class="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="text-sm text-slate-600">Nous utilisons des cookies pour améliorer votre expérience sur <strong>GalaMayo</strong>.</div>
+        <button onclick="acceptCookies()" class="px-8 py-3 bg-galaDark text-white rounded-full font-bold hover:bg-black transition shadow-lg">Tout accepter</button>
+    </div>
+</div>
+
+<style>
+    @keyframes pulse-gala { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .animate-pulse-gala { animation: pulse-gala 2s infinite ease-in-out; }
+</style>
     <nav class="fixed w-full z-50 glass-morphism border-b border-slate-100">
         <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -233,8 +262,14 @@ $photos = $queryGallery->fetchAll();
             </div>
         </div>
     </section>
+<section id="gamme" class="py-24 bg-slate-50">
+    <div id="cart-summary" class="hidden fixed bottom-5 right-5 z-40 bg-galaDark text-white p-4 rounded-full shadow-2xl cursor-pointer hover:scale-110 transition-all duration-300 group" onclick="openCartModal()">
+        <i class="fas fa-shopping-basket text-xl"></i>
+        <span id="cart-count-badge" class="absolute -top-2 -right-2 bg-galaGreen text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm">0</span>
+      </div>
+    
+    </div>
 
-  <section id="gamme" class="py-24 bg-slate-50">
     <div class="max-w-7xl mx-auto px-5">
         <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
             <h2 class="text-3xl sm:text-4xl font-extrabold text-galaDark tracking-tight">Notre Gamme Complète</h2>
@@ -245,26 +280,18 @@ $photos = $queryGallery->fetchAll();
             <?php foreach ($produits as $p): ?>
             <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition duration-300 flex flex-col justify-between group relative" id="product-card-<?= $p['id']; ?>">
                 
-                <span id="badge-rupture-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse <?= (isset($p['stock']) && $p['stock'] <= 0) ? '' : 'hidden'; ?>">
-                    Épuisé
-                </span>
-
+                <span id="badge-rupture-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-red-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 animate-pulse <?= (isset($p['stock']) && $p['stock'] <= 0) ? '' : 'hidden'; ?>">Épuisé</span>
                 <?php if (isset($p['en_solde']) && $p['en_solde'] == 1): ?>
-                    <span id="badge-promo-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'hidden' : ''; ?>">
-                        PROMO
-                    </span>
+                    <span id="badge-promo-<?= $p['id']; ?>" class="absolute top-4 right-4 bg-[#007A3D] text-white text-xs font-black px-3 py-1.5 rounded-full shadow-md uppercase tracking-wider z-10 <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'hidden' : ''; ?>">PROMO</span>
                 <?php endif; ?>
 
                 <div>
                     <div class="aspect-square mb-6 overflow-hidden rounded-2xl bg-slate-50 flex items-center justify-center relative">
                         <img src="assets/img/<?= htmlspecialchars($p['image_url']) ?>" alt="<?= htmlspecialchars($p['nom']) ?>" class="w-full h-full object-contain p-6 group-hover:scale-110 transition duration-500">
                     </div>
-                    
                     <div class="space-y-1">
                         <h3 class="text-xl font-bold text-galaDark"><?= htmlspecialchars($p['nom']) ?></h3>
                         <p class="text-galaGreen text-sm font-black tracking-wide uppercase"><?= htmlspecialchars($p['format']) ?></p>
-                        
-                        
                     </div>
                 </div>
 
@@ -272,15 +299,9 @@ $photos = $queryGallery->fetchAll();
                     <div class="flex items-center justify-between">
                         <div class="flex flex-col">
                             <span class="text-xs text-slate-400 font-medium">Prix conseillé</span>
-                            <span class="text-xl font-black text-galaDark">
-                                <?= isset($p['prix']) && $p['prix'] > 0 ? number_format($p['prix'], 0, ',', ' ') . ' FCFA' : 'Prix sur demande'; ?>
-                            </span>
+                            <span class="text-xl font-black text-galaDark"><?= isset($p['prix']) && $p['prix'] > 0 ? number_format($p['prix'], 0, ',', ' ') . ' FCFA' : 'Prix sur demande'; ?></span>
                         </div>
-                        
-                        <button id="btn-order-<?= $p['id']; ?>" 
-                                onclick="toggleOrderSelector(<?= $p['id'] ?>)" 
-                                class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50' : ''; ?>"
-                                <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'disabled' : ''; ?>>
+                        <button id="btn-order-<?= $p['id']; ?>" onclick="toggleOrderSelector(<?= $p['id'] ?>)" class="bg-[#007A3D]/10 text-[#007A3D] hover:bg-[#007A3D] hover:text-white text-sm font-bold px-4 py-2.5 rounded-xl transition <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-50' : ''; ?>" <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'disabled' : ''; ?>>
                             <?= (isset($p['stock']) && $p['stock'] <= 0) ? 'Indisponible' : 'Commander'; ?>
                         </button>
                     </div>
@@ -288,47 +309,93 @@ $photos = $queryGallery->fetchAll();
                     <div id="selector-container-<?= $p['id'] ?>" data-stock="<?= $p['stock'] ?>" class="hidden bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex flex-col gap-2 transition-all">
                         <div class="flex flex-col sm:flex-row gap-2 items-center justify-between w-full">
                             <div class="flex items-center gap-2 w-full sm:w-auto">
-                                <div class="flex items-center bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-galaGreen transition overflow-hidden h-9 w-full sm:w-28">
-                                    <button type="button" onclick="decrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full transition select-none">
-                                        <i class="fas fa-minus text-xs"></i>
-                                    </button>
-                                    
-                                    <input 
-                                        id="quantity-<?= $p['id'] ?>" 
-                                        type="number" 
-                                        value="1" 
-                                        min="1" 
-                                        max="<?= $p['stock'] ?>"
-                                        oninput="validateInputStock(<?= $p['id'] ?>)"
-                                        class="w-full text-center font-bold text-sm text-slate-700 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    >
-                                    
-                                    <button type="button" onclick="incrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full transition select-none">
-                                        <i class="fas fa-plus text-xs"></i>
-                                    </button>
+                                <div class="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden h-9 w-full sm:w-28">
+                                    <button type="button" onclick="decrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full"><i class="fas fa-minus text-xs"></i></button>
+                                    <input id="quantity-<?= $p['id'] ?>" type="number" value="1" min="1" max="<?= $p['stock'] ?>" class="w-full text-center font-bold text-sm text-slate-700 bg-transparent outline-none">
+                                    <button type="button" onclick="incrementQuantity(<?= $p['id'] ?>)" class="px-3 text-slate-500 hover:bg-slate-100 h-full"><i class="fas fa-plus text-xs"></i></button>
                                 </div>
-                                <select id="unit-<?= $p['id'] ?>" class="w-1/2 sm:w-24 p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-galaGreen outline-none">
+                                <select id="unit-<?= $p['id'] ?>" class="w-1/2 sm:w-24 p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold">
                                     <option value="carton(s)">Carton(s)</option>
                                     <option value="boite(s)">Boîte(s)</option>
                                 </select>
                             </div>
-                            
-                            <button onclick="checkStockAndSubmit(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nom'])) ?>')" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-[#005c2e] transition whitespace-nowrap">
+                            <button onclick="checkStockAndSubmit(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nom'])) ?>', <?= $p['prix'] ?>)" class="w-full sm:w-auto bg-[#007A3D] text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-[#005c2e] transition">
                                 Valider
                             </button>
                         </div>
-                        <p id="error-stock-<?= $p['id'] ?>" class="hidden text-[11px] text-red-600 font-bold mt-1 text-center sm:text-left">
-                            <i class="fas fa-exclamation-triangle"></i> Quantité max disponible : <span id="error-stock-qty-<?= $p['id'] ?>"><?= $p['stock'] ?></span> unités.
-                        </p>
                     </div>
                 </div>
-
             </div>
             <?php endforeach; ?>
         </div>
     </div>
-</section>
+     <div id="cartModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/80 p-4">
+    <div class="bg-white max-w-lg w-full p-8 rounded-[2.5rem] shadow-2xl relative">
+        <button type="button" onclick="document.getElementById('cartModal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-800 text-3xl font-bold">&times;</button>
+        
+        <h2 class="text-2xl font-black mb-4">Votre Panier</h2>
+        <div id="cart-items-list" class="mb-4"></div>
+        <p class="font-bold text-lg mb-6">Total : <span id="cart-total-price">0</span> FCFA</p>
+        <button type="button" onclick="nextToFinalization()" class="w-full py-3 bg-galaGreen text-white rounded-xl font-black">Commander</button>
+    </div>
+</div>
 
+<div id="checkoutModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 p-4">
+    <div class="bg-white max-w-lg w-full p-8 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh] relative">
+        <button type="button" onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-800 text-3xl font-bold">&times;</button>
+
+        <h2 class="text-2xl font-black mb-6">Finaliser la commande</h2>
+        <form id="finalOrderForm" class="space-y-4">
+            <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
+            <input type="text" name="nom" placeholder="Nom *" required class="w-full p-3 rounded-xl border border-slate-200">
+            <input type="text" name="prenom" placeholder="Prénom *" required class="w-full p-3 rounded-xl border border-slate-200">
+            <input type="text" name="cni" placeholder="Numéro CNI *" required class="w-full p-3 rounded-xl border border-slate-200">
+            <input type="text" name="num_commercial" placeholder="Numéro Commercial" class="w-full p-3 rounded-xl border border-slate-200">
+            <input type="text" name="nom_marche" placeholder="Nom du marché *" required class="w-full p-3 rounded-xl border border-slate-200">
+            
+            <select name="region" required class="w-full p-3 rounded-xl border border-slate-200">
+                <option value="">-- Dans quelle région ? --</option>
+                <option value="Adamaoua">Adamaoua</option>
+                <option value="Centre">Centre</option>
+                <option value="Est">Est</option>
+                <option value="Extrême-Nord">Extrême-Nord</option>
+                <option value="Littoral">Littoral</option>
+                <option value="Nord">Nord</option>
+                <option value="Nord-Ouest">Nord-Ouest</option>
+                <option value="Ouest">Ouest</option>
+                <option value="Sud">Sud</option>
+                <option value="Sud-Ouest">Sud-Ouest</option>
+            </select>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase">Copie CNI (Photo/PDF)</label>
+                <label for="cni_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <i class="fas fa-id-card text-2xl text-galaGreen mb-2"></i>
+                        <p id="cni-preview" class="text-sm text-slate-500 font-medium">Cliquez pour importer la CNI</p>
+                    </div>
+                    <input id="cni_file" name="cni_file" type="file" class="hidden" onchange="previewFile(this, 'cni-preview')" accept="image/*,.pdf">
+                </label>
+            </div>
+
+            <div class="space-y-1">
+                <label class="block text-xs font-bold text-slate-500 uppercase">Bon de commande</label>
+                <label for="bon_commande" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <i class="fas fa-file-upload text-2xl text-rose-600 mb-2"></i>
+                        <p id="bon-preview" class="text-sm text-slate-500 font-medium">Cliquez pour importer le bon</p>
+                    </div>
+                    <input id="bon_commande" name="bon_commande" type="file" class="hidden" onchange="previewFile(this, 'bon-preview')" accept="image/*,.pdf">
+                </label>
+            </div>
+
+            <button type="submit" class="w-full py-4 bg-galaGreen text-white rounded-xl font-black uppercase hover:bg-green-700 transition">Finaliser la commande</button>
+            
+            <button type="button" onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="w-full py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Annuler</button>
+        </form>
+    </div>
+</div>
+</select>
     <section id="galerie" class="py-24 bg-white">
         <div class="max-w-7xl mx-auto px-5">
             <div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -432,6 +499,7 @@ $photos = $queryGallery->fetchAll();
             <div id="contact-response" class="hidden mb-6 p-4 rounded-xl text-center font-bold"></div>
 
             <form id="contactForm" class="space-y-6">
+                <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-2">Nom complet *</label>
@@ -444,7 +512,7 @@ $photos = $queryGallery->fetchAll();
                 </div>
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">Votre Message / Détails de la commande</label>
-                    <textarea name="message" rows="5" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Votre texte ou message de commande automatique apparaîtra ici..."></textarea>
+                    <textarea name="message" id="message-commande" rows="5" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Décrivez votre commande ou posez votre question..."></textarea>
                 </div>
                 <button type="submit" class="w-full py-4 bg-[#007A3D] text-white rounded-2xl font-bold shadow-lg hover:bg-[#005c2e] transition uppercase tracking-wider text-sm">
                     Envoyer le message
@@ -453,7 +521,58 @@ $photos = $queryGallery->fetchAll();
         </div>
     </div>
 </section>
+<button onclick="openRecrutementModal()" 
+        class="inline-block px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
+    <i class="fas fa-paper-plane mr-2"></i> Soumettre mon dossier
+</button>
 
+<div id="recrutementModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm hidden p-4">
+    <div class="bg-white w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl relative">
+        
+        <button onclick="document.getElementById('recrutementModal').classList.add('hidden')" 
+                class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition">
+            <i class="fas fa-times text-2xl"></i>
+        </button>
+
+        <div id="successMessage" class="hidden text-center py-10">
+            <div class="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-check text-4xl"></i>
+            </div>
+            <h3 class="text-2xl font-black text-slate-800 mb-2">Dossier transmis !</h3>
+            <p class="text-slate-500">Merci ! Votre candidature a bien été reçue par notre service RH.</p>
+            <button onclick="document.getElementById('recrutementModal').classList.add('hidden')" 
+                    class="mt-8 px-8 py-3 bg-galaDark text-white rounded-xl font-bold">Fermer</button>
+        </div>
+
+        <form id="recrutementForm" class="space-y-4">
+            <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
+            <h2 class="text-xl font-black text-galaDark uppercase mb-4">Candidature</h2>
+            <input type="text" name="nom" placeholder="Nom complet *" required class="w-full p-4 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-galaGreen">
+            <div class="grid grid-cols-2 gap-4">
+                <input type="email" name="email" placeholder="Email *" required class="w-full p-4 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-galaGreen">
+                <input type="tel" name="telephone" placeholder="Téléphone *" required class="w-full p-4 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-galaGreen">
+            </div>
+            <input type="text" name="poste" placeholder="Poste visé *" required class="w-full p-4 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-galaGreen">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label id="cvLabel" class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-galaGreen hover:bg-slate-50 transition">
+                    <i class="fas fa-file-pdf text-galaGreen text-2xl mb-2"></i>
+                    <span class="text-xs text-slate-500 font-bold uppercase">CV (PDF)</span>
+                    <input type="file" name="cv" accept=".pdf" required class="hidden" onchange="updateFileName('cvLabel', this)">
+                </label>
+                <label id="lettreLabel" class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer hover:border-galaGreen hover:bg-slate-50 transition">
+                    <i class="fas fa-file-alt text-galaDark text-2xl mb-2"></i>
+                    <span class="text-xs text-slate-500 font-bold uppercase">Lettre (PDF)</span>
+                    <input type="file" name="lettre" accept=".pdf" required class="hidden" onchange="updateFileName('lettreLabel', this)">
+                </label>
+            </div>
+
+            <button type="submit" id="submitBtn" class="w-full py-4 bg-galaGreen text-white rounded-xl font-black hover:bg-green-700 transition">
+                Envoyer le dossier
+            </button>
+        </form>
+    </div>
+</div>
     <div class="bg-galaDark py-12">
         <div class="max-w-7xl mx-auto px-5 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div><div class="text-2xl sm:text-3xl font-extrabold text-white mb-1">50+</div><div class="text-green-300 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest">Collaborateurs</div></div>
@@ -505,193 +624,6 @@ $photos = $queryGallery->fetchAll();
             </div>
         </div>
     </div>
-
-  
-
-  <script>
-
-    // Menu mobile toggle
-    const menuBtn = document.getElementById('menu-btn');
-    const mobileNav = document.getElementById('mobile-nav');
-    if(menuBtn && mobileNav) {
-        menuBtn.addEventListener('click', () => {
-            mobileNav.classList.toggle('active');
-        });
-    }
-function toggleModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-
-    // Basculer l'affichage de la modale
-    modal.classList.toggle('hidden');
-
-    // Optionnel : Bloquer le défilement du body en arrière-plan quand la modale est ouverte
-    if (!modal.classList.contains('hidden')) {
-        document.body.classList.add('overflow-hidden');
-    } else {
-        document.body.classList.remove('overflow-hidden');
-    }
-}
-
-// Fermer la modale si l'utilisateur clique à l'extérieur de la boîte blanche
-window.addEventListener('click', function(e) {
-    const legalModal = document.getElementById('legal-modal');
-    const privacyModal = document.getElementById('privacy-modal');
-
-    if (e.target === legalModal) toggleModal('legal-modal');
-    if (e.target === privacyModal) toggleModal('privacy-modal');
-});
-    // Gestion du sélecteur de commande directe
-    function toggleOrderSelector(id) {
-        const container = document.getElementById('selector-container-' + id);
-        if (container) {
-            container.classList.toggle('hidden');
-        }
-    }
-
-    // Fonctions de contrôle des quantités pour le sélecteur (Boutons + et -)
-    function incrementQuantity(id) {
-        const input = document.getElementById('quantity-' + id);
-        const container = document.getElementById('selector-container-' + id);
-        const maxStock = parseInt(container.getAttribute('data-stock')) || 999;
-        let currentVal = parseInt(input.value) || 0;
-        if (currentVal < maxStock) {
-            input.value = currentVal + 1;
-            validateInputStock(id);
-        }
-    }
-
-    function decrementQuantity(id) {
-        const input = document.getElementById('quantity-' + id);
-        let currentVal = parseInt(input.value) || 1;
-        if (currentVal > 1) {
-            input.value = currentVal - 1;
-            validateInputStock(id);
-        }
-    }
-
-    // Permet la saisie manuelle fluide sans bloquer l'écriture
-    function validateInputStock(id) {
-        const input = document.getElementById('quantity-' + id);
-        const container = document.getElementById('selector-container-' + id);
-        const errorMsg = document.getElementById('error-stock-' + id);
-        const maxStock = parseInt(container.getAttribute('data-stock')) || 0;
-        
-        if (input.value === "") {
-            if(errorMsg) errorMsg.classList.add('hidden');
-            return;
-        }
-
-        let val = parseInt(input.value);
-
-        if (val > maxStock) {
-            if(errorMsg) errorMsg.classList.remove('hidden');
-            input.value = maxStock;
-        } else {
-            if(errorMsg) errorMsg.classList.add('hidden');
-        }
-    }
-
-    // Sécurité au cas où l'utilisateur quitte le champ en le laissant vide
-    document.querySelectorAll("input[id^='quantity-']").forEach(input => {
-        input.addEventListener('blur', function() {
-            let val = parseInt(this.value);
-            if (isNaN(val) || val < 1) {
-                this.value = 1;
-            }
-        });
-    });
-
-    // ÉTAPE 1 : Le client clique sur "Valider" sous un produit de la gamme
-    function checkStockAndSubmit(id, productName) {
-        const quantityInput = document.getElementById('quantity-' + id);
-        let quantity = parseInt(quantityInput.value) || 1;
-        const unit = document.getElementById('unit-' + id).value;
-        const container = document.getElementById('selector-container-' + id);
-        const maxStock = parseInt(container.getAttribute('data-stock')) || 0;
-
-        if (quantity > maxStock) {
-            alert("Désolé, la quantité demandée dépasse le stock disponible.");
-            return false;
-        }
-        
-        // 1. Écriture automatique dans la zone de message
-        const messageField = document.querySelector('textarea[name="message"]');
-        if (messageField) {
-            messageField.value = "Bonjour, je souhaite commander directement " + quantity + " " + unit + " de " + productName + ". Merci de me recontacter au plus vite pour valider les modalités.";
-        }
-        
-        // 2. Défilement fluide vers le formulaire de contact
-        const contactSection = document.getElementById('contact');
-        if (contactSection) {
-            contactSection.scrollIntoView({ behavior: 'smooth' });
-            setTimeout(() => {
-                const nameInput = document.querySelector('input[name="nom"]');
-                if(nameInput) nameInput.focus();
-            }, 800);
-        }
-
-        // 3. Soustraction automatique immédiate du stock en BDD (Requête asynchrone vers l'administration)
-        // Note: l'URL pointe vers 'admin/products_manager.php' car votre fichier s'y trouve.
-        fetch('admin/products_manager.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                'ajax_decrement_id': id,
-                'qty_to_remove': quantity
-            })
-        })
-        .then(response => {
-            if (response.ok) {
-                const newStock = maxStock - quantity;
-                container.setAttribute('data-stock', newStock);
-                // Si le stock tombe à zéro, on actualisera l'affichage de la carte après validation du formulaire
-            }
-        })
-        .catch(error => console.error('Erreur lors de la mise à jour du stock :', error));
-    }
-
-    // ÉTAPE 2 : Traitement et Envoi réel du formulaire de contact en BDD via AJAX
-    const contactForm = document.getElementById('contactForm');
-    const responseDiv = document.getElementById('contact-response');
-
-    if (contactForm) {
-        contactForm.addEventListener('submit', function (e) {
-            e.preventDefault(); // Empêche le rechargement brutal de la page
-
-            const formData = new FormData(this);
-
-            fetch('traitement_contact.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(async response => {
-                const text = await response.text();
-                responseDiv.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
-                
-                if (response.ok) {
-                    // Message de succès vert
-                    responseDiv.classList.add('bg-green-100', 'text-green-700');
-                    responseDiv.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ${text}`;
-                    contactForm.reset(); // Vide le formulaire
-                    
-                    // Optionnel : Rafraîchir après 2 secondes pour voir le changement des badges RUPTURE de stock si applicable
-                    setTimeout(() => { location.reload(); }, 2500);
-                } else {
-                    // Message d'erreur rouge
-                    responseDiv.classList.add('bg-red-100', 'text-red-700');
-                    responseDiv.innerHTML = `<i class="fas fa-exclamation-circle mr-2"></i> ${text}`;
-                }
-            })
-            .catch(error => {
-                responseDiv.classList.remove('hidden', 'bg-green-100', 'text-green-700');
-                responseDiv.classList.add('bg-red-100', 'text-red-700');
-                responseDiv.innerHTML = `<i class="fas fa-wifi mr-2"></i> Erreur réseau impossible de joindre le serveur.`;
-                console.error(error);
-            });
-        });
-        
-    }
-</script>
+    <script src="assets/js/script.js"></script>
 </body>
 </html>

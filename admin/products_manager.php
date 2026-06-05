@@ -110,6 +110,23 @@ $stmt_products->bindValue(':limit', $items_per_page, PDO::PARAM_INT);
 $stmt_products->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt_products->execute();
 $products = $stmt_products->fetchAll();
+// Dans admin/products_manager.php
+if (isset($_POST['ajax_decrement_id'])) {
+    $id = intval($_POST['ajax_decrement_id']);
+    $qty = intval($_POST['qty_to_remove']);
+
+    // Décrémentation sécurisée dans la BDD
+    $stmt = $pdo->prepare("UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty");
+    $stmt->execute([':qty' => $qty, ':id' => $id]);
+    
+    if ($stmt->rowCount() > 0) {
+        echo json_encode(['status' => 'success']);
+    } else {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Stock insuffisant']);
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -147,6 +164,11 @@ $products = $stmt_products->fetchAll();
                     <i class="fas fa-images w-5 text-center text-lg"></i> 
                     <span>Galerie</span>
                 </a>
+               <a href="voir_candidatures.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'voir_candidatures.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5'?>">
+                    <i class="fas fa-users w-5"></i> <span>Candidatures</span>
+                </a>
+                <a href="admin_commandes.php" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'admin_commandes.php') ? 'bg-galaGreen text-white shadow-md' : 'text-slate-700 hover:bg-black/5'?>">
+                    <i class="fas fa-shopping-cart w-5"></i> <span>Finaliser commandes</span>
                 </a>
                 <a href="http://localhost/sitedynamique/index.php#accueil" class="flex items-center space-x-3 p-3 rounded-xl transition font-semibold <?= ($current_page == 'http://localhost/sitedynamique/index.php#accueil') ? 'bg-galaGreen text-white shadow-md' : 'text-[#E30613] hover:bg-black/5' ?>">
                     <i class="fas fa-globe w-5"></i> <span>Consulter le site</span>
@@ -197,7 +219,9 @@ $products = $stmt_products->fetchAll();
                     <i class="fas fa-plus-circle text-galaGreen text-xl"></i> <span>Ajouter un Produit</span>
                 </h3>
                 <form id="productForm" method="POST" enctype="multipart/form-data" class="space-y-4">
-                    <input type="hidden" name="id" id="prodId">
+                    <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
+                    <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
+                <input type="hidden" name="id" id="prodId">
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Nom du produit</label>
                         <input type="text" name="nom" id="prodNom" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-galaGreen focus:ring-4 focus:ring-galaGreen/10 bg-white transition-all duration-200" required>
