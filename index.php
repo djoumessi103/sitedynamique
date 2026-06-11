@@ -1,4 +1,6 @@
-<?php 
+<?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL); 
 session_start(); // Nécessaire pour détecter si l'admin est connecté
 
 // 1. ON INCLUT D'ABORD LA BASE DE DONNÉES (Crée la variable $pdo)
@@ -92,6 +94,11 @@ $photos = $queryGallery->fetchAll();
             100% { transform: translateY(0px) rotate(2deg); }
         }
         .animate-float { animation: float 5s ease-in-out infinite; }
+        /* Animation de disparition en douceur */
+.fade-out {
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+}
     </style>
 </head>
 <body class="font-sans antialiased text-slate-900 overflow-x-hidden">
@@ -139,6 +146,7 @@ $photos = $queryGallery->fetchAll();
                 <a id="link-nav-qualite" href="#qualite" class="hover:text-galaGreen transition">Qualité</a>
                 <a id="link-nav-galerie-top" href="#galerie" class="hover:text-galaGreen transition">Galerie</a>
             </div>
+
 
             <div class="flex items-center gap-4">
                 <div class="hidden md:flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -345,7 +353,7 @@ $photos = $queryGallery->fetchAll();
         <button type="button" onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-800 text-3xl font-bold">&times;</button>
 
         <h2 class="text-2xl font-black mb-6">Finaliser la commande</h2>
-        <form id="finalOrderForm" class="space-y-4">
+        <form id="finalOrderForm" action="traitement_commande.php" method="POST" enctype="multipart/form-data">
             <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
             <input type="text" name="nom" placeholder="Nom *" required class="w-full p-3 rounded-xl border border-slate-200">
             <input type="text" name="prenom" placeholder="Prénom *" required class="w-full p-3 rounded-xl border border-slate-200">
@@ -497,9 +505,7 @@ $photos = $queryGallery->fetchAll();
             <h2 class="text-3xl font-extrabold text-galaDark mb-8 text-center">Finaliser votre Commande / Nous Contacter</h2>
             
             <div id="contact-response" class="hidden mb-6 p-4 rounded-xl text-center font-bold"></div>
-
-            <form id="contactForm" class="space-y-6">
-                <input type="text" name="hp_field" style="display:none !important;" tabindex="-1" autocomplete="off">
+             <form id="contactForm" method="POST" class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-2">Nom complet *</label>
@@ -521,6 +527,7 @@ $photos = $queryGallery->fetchAll();
         </div>
     </div>
 </section>
+
 <button onclick="openRecrutementModal()" 
         class="inline-block px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
     <i class="fas fa-paper-plane mr-2"></i> Soumettre mon dossier
@@ -625,5 +632,33 @@ $photos = $queryGallery->fetchAll();
         </div>
     </div>
     <script src="assets/js/script.js"></script>
+    <button onclick="document.getElementById('ratingModal').classList.remove('hidden')" 
+        class="bg-blue-500 text-white p-4 rounded-xl fixed bottom-4 right-4 z-[999]">
+    Tester la modale avis
+</button>
+    <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300">
+        <div class="text-4xl mb-4">💬</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
+        <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>
+        
+        <div id="star-rating" class="flex justify-center gap-3 text-3xl mb-8">
+            <span onclick="setRating(1)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(2)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(3)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(4)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(5)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+        </div>
+        
+        <input type="hidden" id="order_id" value="">
+        <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
+<input type="hidden" id="order_id" value="">
+
+        <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
+            Valider mon avis
+        </button>
+    </div>
+</div>
+</div>
 </body>
 </html>

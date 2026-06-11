@@ -138,6 +138,7 @@ if (isset($_POST['ajax_decrement_id'])) {
     <script>
         tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a', galaGold: '#f8f9fa', } } } }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-[#f1f5f9] font-sans min-h-screen flex flex-col md:flex-row antialiased text-slate-800">
@@ -307,42 +308,45 @@ if (isset($_POST['ajax_decrement_id'])) {
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <?php if(empty($products)): ?>
-                            <tr>
+                            <tr data-id="<?= $c['id'] ?>" class="transition-all duration-500 hover:bg-slate-50">
                                 <<td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-bold">
     <span id="admin-stock-<?= $product['id'] ?>"><?= $product['stock'] ?></span> unités
 </td>
                             </tr>
                             <?php else: ?>
-                                <?php foreach ($products as $index => $p): ?>
-                                <tr class="hover:bg-slate-50/50 transition-colors duration-150 <?= $p['stock'] == 0 ? 'bg-rose-50/20 hover:bg-rose-50/40' : '' ?>">
-                                    <td class="p-4 text-slate-400 text-xs font-bold text-center">#<?= $offset + $index + 1 ?></td>
-                                    <td class="p-4">
-                                        <img src="../assets/img/<?= htmlspecialchars($p['image_url']) ?>" class="w-11 h-11 object-cover rounded-xl shadow-sm border border-slate-200/60">
-                                    </td>
-                                    <td class="p-4 font-bold text-slate-900"><?= htmlspecialchars($p['nom']) ?></td>
-                                    <td class="p-4 text-slate-600 text-sm"><?= htmlspecialchars($p['format']) ?></td>
-                                    <td class="p-4 font-extrabold text-galaGreen text-sm"><?= number_format($p['prix'], 0, ',', ' ') ?> XAF</td>
-                                    <td class="p-4">
-                                        <?php if ($p['stock'] == 0): ?>
-                                            <span class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-rose-100 text-rose-700 inline-flex items-center gap-1.5 shadow-sm shadow-rose-600/5">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping"></span>RUPTURE
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold <?= $p['stock'] > 5 ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100' ?>">
-                                                <?= $p['stock'] ?> pcs
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="p-4 text-center space-x-0.5 whitespace-nowrap">
-                                        <button onclick='editProduct(<?= json_encode($p, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="text-amber-500 hover:bg-amber-50 p-2 rounded-xl transition-colors duration-150" title="Modifier">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <a href="products_manager.php?delete=<?= $p['id'] ?>" onclick="return confirm('Supprimer définitivement ce produit ?');" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-colors duration-150 inline-block" title="Supprimer">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
-                                    </td>
+                    <?php foreach ($products as $index => $p): ?>
+    <tr data-id="<?= $p['id'] ?>" class="hover:bg-slate-50/50 transition-colors duration-150 <?= $p['stock'] == 0 ? 'bg-rose-50/20' : '' ?>">
+        <td class="p-4 text-slate-400 text-xs font-bold text-center">#<?= $offset + $index + 1 ?></td>
+        <td class="p-4"><img src="../assets/img/<?= htmlspecialchars($p['image_url']) ?>" class="w-11 h-11 object-cover rounded-xl shadow-sm border border-slate-200/60"></td>
+        <td class="p-4 font-bold text-slate-900"><?= htmlspecialchars($p['nom']) ?></td>
+        <td class="p-4 text-slate-600 text-sm"><?= htmlspecialchars($p['format']) ?></td>
+        <td class="p-4 font-extrabold text-galaGreen text-sm"><?= number_format($p['prix'], 0, ',', ' ') ?> XAF</td>
+        <td class="p-4">
+            <?php if ($p['stock'] == 0): ?>
+                <span class="px-2.5 py-1 rounded-lg text-[11px] font-black bg-rose-100 text-rose-700">RUPTURE</span>
+            <?php else: ?>
+                <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700"><?= $p['stock'] ?> pcs</span>
+            <?php endif; ?>
+        </td>
+        <td class="p-4 text-center whitespace-nowrap">
+            <div class="flex items-center justify-center space-x-2">
+                <button type="button" onclick='editProduct(<?= json_encode($p, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' class="w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-500 transition-all duration-300 shadow-sm text-amber-500 hover:text-white">
+                    <i class="fas fa-edit text-sm"></i>
+                </button>
+                <button type="button" 
+        onclick="supprimerProduit(<?= $p['id'] ?>)" 
+        class="group flex items-center justify-center w-9 h-9 rounded-full bg-rose-50 hover:bg-rose-600 transition-all duration-300 shadow-sm"
+        title="Supprimer">
+    <i class="fas fa-trash-alt text-rose-500 group-hover:text-white transition-colors text-sm"></i>
+</button>
+            </div>
+        </td>
+    </tr>
+<?php endforeach; ?>
+
+    </div>
+</td>
                                 </tr>
-                                <?php endforeach; ?>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -470,6 +474,33 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 4000);
     });
 });
+function supprimerProduit(id) {
+    Swal.fire({
+        title: 'Supprimer ce produit ?',
+        text: "Cette action est irréversible.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Oui, supprimer'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Appel vers le fichier dédié aux produits
+            fetch('delete_products.php?id=' + id)
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    const row = document.querySelector(`tr[data-id='${id}']`);
+                    if (row) {
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 500);
+                        Swal.fire('Supprimé !', 'Le produit a été retiré.', 'success');
+                    }
+                }
+            });
+        }
+    });
+}
     </script>
 </body>
 </html>

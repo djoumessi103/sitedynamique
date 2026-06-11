@@ -10,12 +10,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
 // ==========================================
 // CONFIGURATION DE LA PAGINATION
 // ==========================================
-$items_per_page = 5; 
+$items_per_page = 10; // Mettez une valeur plus grande que votre nombre de messages (58)
 $page = isset($_GET['p']) && (int)$_GET['p'] > 0 ? (int)$_GET['p'] : 1;
 $offset = ($page - 1) * $items_per_page;
 
 $total_items = $pdo->query("SELECT COUNT(*) FROM contacts")->fetchColumn();
 $total_pages = ceil($total_items / $items_per_page);
+
+// ... le reste de votre code (le prepare, le bindValue, etc.) ne change pas
 
 if ($page > $total_pages && $total_pages > 0) { 
     $page = $total_pages; 
@@ -39,7 +41,8 @@ $messages = $stmt->fetchAll();
     <script>
         tailwind.config = { theme: { extend: { colors: { galaGreen: '#16a34a', galaDark: '#0f172a', galaGold: '#f8f9f8f1', } } } }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex flex-col md:flex-row">
 
@@ -116,70 +119,55 @@ $messages = $stmt->fetchAll();
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        <?php if (empty($messages)): ?>
-                        <tr>
-                            <td colspan="5" class="p-10 text-center text-slate-400 font-semibold">Aucun message reçu pour le moment.</td>
-                        </tr>
-                        <?php endif; ?>
 
-                        <?php foreach ($messages as $key => $m): ?>
-                        <tr class="hover:bg-slate-50/80 transition">
-                            
-                            <!-- Index -->
-                            <td class="p-4 md:p-5 font-semibold text-slate-400 hidden lg:table-cell">
-                                <?= $offset + $key + 1 ?>
-                            </td>
-                            
-                            <!-- Expéditeur + Message -->
-                            <td class="p-4 md:p-5 max-w-0 sm:max-w-xs md:max-w-md lg:max-w-lg">
-                                <div class="font-bold text-slate-800 text-sm md:text-base flex flex-wrap items-center gap-2">
-                                    <span><?= htmlspecialchars($m['nom_complet']) ?></span>
-                                    <span class="text-[10px] font-medium text-slate-400 md:hidden block">
-                                        • <?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>
-                                    </span>
-                                </div>
-                                <div class="text-xs md:text-sm text-slate-500 mt-1 truncate">
-                                    <?= htmlspecialchars($m['message']) ?>
-                                </div>
-                            </td>
-                            
-                            <!-- Téléphone -->
-                            <td class="p-4 md:p-5 whitespace-nowrap hidden sm:table-cell">
-                                <a href="tel:<?= $m['telephone'] ?>" class="text-galaGreen hover:underline font-semibold text-sm flex items-center space-x-2">
-                                    <i class="fas fa-phone-alt text-[10px]"></i> <span><?= htmlspecialchars($m['telephone']) ?></span>
-                                </a>
-                            </td>
-                            
-                            <!-- Date -->
-                            <td class="p-4 md:p-5 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden md:table-cell">
-                                <?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>
-                            </td>
-                            
-                            <!-- ACTIONS INDÉPENDANTES (Sans bug de clic) -->
-                            <td class="p-4 md:p-5 text-center whitespace-nowrap">
-                                <div class="flex items-center justify-center space-x-2">
-                                    
-                                    <!-- Bouton LIRE -->
-                                    <button 
-                                        type="button"
-                                        onclick="openMessageModal(<?= htmlspecialchars(json_encode($m['nom_complet'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, <?= htmlspecialchars(json_encode($m['telephone'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, <?= htmlspecialchars(json_encode($m['message'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, '<?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>')" 
-                                        class="bg-slate-100 hover:bg-galaGreen hover:text-white text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-sm flex items-center space-x-1">
-                                        <i class="fas fa-eye text-[11px]"></i> <span>Lire</span>
-                                    </button>
-                                    
-                                    <!-- Bouton SUPPRIMER (Explicite et visible) -->
-                                    <a 
-                                        href="delete_message.php?id=<?= $m['id'] ?>" 
-                                        onclick="return confirm('Confirmer la suppression définitive de ce message ?');" 
-                                        class="bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white p-2 rounded-lg transition shadow-sm text-xs" 
-                                        title="Supprimer">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </a>
-                                    
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
+                       <?php foreach ($messages as $key => $m): ?>
+    <tr class="hover:bg-slate-50/80 transition" data-id="<?= $m['id'] ?>">
+        
+        <td class="p-4 md:p-5 font-semibold text-slate-400 hidden lg:table-cell">
+            <?= $offset + $key + 1 ?>
+        </td>
+        
+        <td class="p-4 md:p-5 max-w-0 sm:max-w-xs md:max-w-md lg:max-w-lg">
+            <div class="font-bold text-slate-800 text-sm md:text-base flex flex-wrap items-center gap-2">
+                <span><?= htmlspecialchars($m['nom_complet']) ?></span>
+                <span class="text-[10px] font-medium text-slate-400 md:hidden block">
+                    • <?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>
+                </span>
+            </div>
+            <div class="text-xs md:text-sm text-slate-500 mt-1 truncate">
+                <?= htmlspecialchars($m['message']) ?>
+            </div>
+        </td>
+        
+        <td class="p-4 md:p-5 whitespace-nowrap hidden sm:table-cell">
+            <a href="tel:<?= $m['telephone'] ?>" class="text-galaGreen hover:underline font-semibold text-sm flex items-center space-x-2">
+                <i class="fas fa-phone-alt text-[10px]"></i> <span><?= htmlspecialchars($m['telephone']) ?></span>
+            </a>
+        </td>
+        
+        <td class="p-4 md:p-5 text-xs md:text-sm text-slate-400 whitespace-nowrap hidden md:table-cell">
+            <?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>
+        </td>
+        
+        <td class="p-4 md:p-5 text-center whitespace-nowrap">
+            <div class="flex items-center justify-center space-x-2">
+                <button type="button"
+                        onclick="openMessageModal(<?= htmlspecialchars(json_encode($m['nom_complet'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, <?= htmlspecialchars(json_encode($m['telephone'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, <?= htmlspecialchars(json_encode($m['message'], JSON_HEX_APOS|JSON_HEX_QUOT)) ?>, '<?= date('d/m/Y à H:i', strtotime($m['date_envoi'])) ?>')" 
+                        class="group flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 hover:bg-blue-600 transition-all duration-300 shadow-sm"
+                        title="Lire le message">
+                    <i class="fas fa-eye text-blue-500 group-hover:text-white transition-colors text-sm"></i>
+                </button>
+
+                <button type="button"
+                        onclick="supprimerMessage(<?= $m['id'] ?>)"
+                        class="group flex items-center justify-center w-8 h-8 rounded-full bg-red-50 hover:bg-red-600 transition-all duration-300 shadow-sm"
+                        title="Supprimer">
+                    <i class="fas fa-trash-alt text-red-500 group-hover:text-white transition-colors text-sm"></i>
+                </button>
+            </div>
+        </td>
+    </tr>
+<?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -267,6 +255,33 @@ $messages = $stmt->fetchAll();
         document.addEventListener('keydown', function(e) {
             if (e.key === "Escape") closeMessageModal();
         });
+     function supprimerMessage(id) {
+    Swal.fire({
+        title: 'Supprimer ce message ?',
+        text: "Cette action est irréversible.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Oui, supprimer',
+        cancelButtonText: 'Annuler',
+        customClass: { popup: 'rounded-3xl' }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Appel spécifique à delete_messages.php
+            fetch('delete_messages.php?id=' + id)
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    const row = document.querySelector(`tr[data-id='${id}']`);
+                    row.style.opacity = '0';
+                    setTimeout(() => row.remove(), 500);
+                    Swal.fire('Supprimé !', 'Le message a été retiré.', 'success');
+                }
+            });
+        }
+    });
+}
     </script>
 </body>
 </html>

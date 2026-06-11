@@ -1,4 +1,4 @@
- document.getElementById('contactForm').addEventListener('submit', function(e) {
+document.getElementById('contactForm').addEventListener('submit', function(e) {
     e.preventDefault(); 
     
     const btn = this.querySelector('button[type="submit"]');
@@ -7,47 +7,64 @@
 
     btn.disabled = true;
     btn.innerText = "Envoi en cours...";
-    responseDiv.classList.remove('hidden'); // Assurez-vous qu'il est visible
+    responseDiv.classList.remove('hidden');
 
     fetch('traitement_contact.php', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.text())
-    .then(data => {
-        // 1. Afficher le succès
-        responseDiv.innerHTML = data;
-        responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-green-100 text-green-700 block";
-        this.reset();
-        localStorage.removeItem('message_commande');
-
-        // 2. Faire disparaître après 5 secondes (5000 millisecondes)
-        setTimeout(() => {
-            responseDiv.classList.add('hidden');
-        }, 5000); 
-    })
-    .catch(error => {
-        responseDiv.innerHTML = "Une erreur est survenue, veuillez réessayer.";
-        responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-red-100 text-red-700 block";
-    })
-    .finally(() => {
+    .then(response => response.text().then(text => ({ ok: response.ok, text })))
+    .then(result => {
         btn.disabled = false;
         btn.innerText = "Envoyer le message";
+
+        // Dans votre bloc contactForm (result.ok) :
+        if (result) {
+            responseDiv.innerHTML = result.text;
+            responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-green-100 text-green-700 block";
+            this.reset();
+
+            // Vérifie si l'avis a déjà été demandé durant cette session
+            if (!sessionStorage.getItem('avisDejaDemande')) {
+                setTimeout(() => {
+                    const modal = document.getElementById('ratingModal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        // On marque l'avis comme "déjà demandé" pour cette session
+                        
+                    }
+                }, 1000);
+            }
+            // Disparition du message de succès
+            setTimeout(() => {
+                responseDiv.classList.add('hidden');
+                responseDiv.innerHTML = "";
+            }, 5000);
+        } else {
+            responseDiv.innerHTML = result.text;
+            responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-red-100 text-red-700 block";
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerText = "Envoyer le message";
+        responseDiv.innerHTML = "❌ Erreur de connexion au serveur.";
+        responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-red-100 text-red-700 block";
     });
 });
-    let monPanier = [];
+
+let monPanier = [];
+let currentNote = 5; // Initialisation sécurisée
+
 async function checkStockAndSubmit(id, nom, prix) {
-    // 1. Récupération des données du formulaire produit
     const input = document.getElementById('quantity-' + id);
     const unitInput = document.getElementById('unit-' + id);
     const qtyRequested = parseInt(input.value) || 1;
     const unit = unitInput ? unitInput.value : 'carton(s)';
     
-    // 2. Vérification du stock via l'API
     const response = await fetch(`api.php?action=get_stock&id=${id}`);
     const data = await response.json();
     
-    // On compare avec ce qui est déjà dans le panier local pour éviter de dépasser
     const itemInCart = monPanier.find(item => item.id === id && item.unit === unit);
     const totalQtyInCart = itemInCart ? itemInCart.qty : 0;
 
@@ -56,110 +73,89 @@ async function checkStockAndSubmit(id, nom, prix) {
         return;
     }
 
-    // 3. Ajout au panier
     if (itemInCart) {
         itemInCart.qty += qtyRequested;
     } else {
         monPanier.push({ id, nom, qty: qtyRequested, unit, prix: parseFloat(prix) });
     }
     
-    // 4. Mise à jour visuelle (Badge et apparition du bouton)
     updateBadge();
     const cartSummary = document.getElementById('cart-summary');
     if (cartSummary) cartSummary.classList.remove('hidden');
     
-    // --- LIGNE DÉSACTIVÉE POUR NE PAS OUVRIR LA MODALE AUTOMATIQUEMENT ---
-    // openCartModal(); 
-    
-    // Feedback optionnel
     alert("Produit ajouté au panier !");
 }
-  
-    function openCartModal() {
-        const list = document.getElementById('cart-items-list');
-        const totalElement = document.getElementById('cart-total-price');
-        let totalGlobal = 0;
+ 
+function openCartModal() {
+    const list = document.getElementById('cart-items-list');
+    const totalElement = document.getElementById('cart-total-price');
+    let totalGlobal = 0;
 
-        list.innerHTML = monPanier.map((item, index) => {
-            const sousTotal = item.qty * item.prix;
-            totalGlobal += sousTotal;
-            return renderCartItem(item, index, sousTotal);
-        }).join('');
+    list.innerHTML = monPanier.map((item, index) => {
+        const sousTotal = item.qty * item.prix;
+        totalGlobal += sousTotal;
+        return renderCartItem(item, index, sousTotal);
+    }).join('');
 
-        totalElement.textContent = totalGlobal.toLocaleString();
-        document.getElementById('cartModal').classList.remove('hidden');
-    }
+    totalElement.textContent = totalGlobal.toLocaleString();
+    document.getElementById('cartModal').classList.remove('hidden');
+}
 
-    function renderCartItem(item, index, total) {
-        return `
-            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl mb-3">
-                <div>
-                    <h4 class="font-bold text-galaDark">${item.nom}</h4>
-                    <p class="text-xs text-slate-500">${item.qty} ${item.unit} x ${item.prix.toLocaleString()} FCFA</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="font-bold text-sm">${total.toLocaleString()} FCFA</span>
-                    <button type="button" onclick="modifierQuantite(${index}, -1)" class="w-8 h-8 rounded-full bg-slate-200">-</button>
-                    <button type="button" onclick="supprimerDuPanier(${index})" class="text-red-500"><i class="fas fa-trash-alt"></i></button>
-                </div>
-            </div>`;
-    }
+function renderCartItem(item, index, total) {
+    return `
+        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl mb-3">
+            <div>
+                <h4 class="font-bold text-galaDark">${item.nom}</h4>
+                <p class="text-xs text-slate-500">${item.qty} ${item.unit} x ${item.prix.toLocaleString()} FCFA</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="font-bold text-sm">${total.toLocaleString()} FCFA</span>
+                <button type="button" onclick="modifierQuantite(${index}, -1)" class="w-8 h-8 rounded-full bg-slate-200">-</button>
+                <button type="button" onclick="supprimerDuPanier(${index})" class="text-red-500"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>`;
+}
 
-    function modifierQuantite(index, delta) {
-        monPanier[index].qty += delta;
-        if (monPanier[index].qty <= 0) monPanier.splice(index, 1);
-        openCartModal();
-        updateBadge();
-    }
+function modifierQuantite(index, delta) {
+    monPanier[index].qty += delta;
+    if (monPanier[index].qty <= 0) monPanier.splice(index, 1);
+    openCartModal();
+    updateBadge();
+}
 
-    function supprimerDuPanier(index) {
-        monPanier.splice(index, 1);
-        openCartModal();
-        updateBadge();
-    }
+function supprimerDuPanier(index) {
+    monPanier.splice(index, 1);
+    openCartModal();
+    updateBadge();
+}
 
-   function updateBadge() {
+function updateBadge() {
     const cartSummary = document.getElementById('cart-summary');
     const badge = document.getElementById('cart-count-badge');
-    
-    // 1. Calcul du total des quantités
     const totalQty = monPanier.reduce((acc, item) => acc + parseInt(item.qty), 0);
     
-    // 2. Mise à jour du chiffre
-    if (badge) {
-        badge.textContent = totalQty;
-    }
+    if (badge) badge.textContent = totalQty;
     
-    // 3. Affichage du bouton flottant (si > 0 on affiche, sinon on cache)
     if (cartSummary) {
-        if (totalQty > 0) {
-            cartSummary.classList.remove('hidden'); // Affiche le panier
-        } else {
-            cartSummary.classList.add('hidden');    // Cache le panier
-        }
+        if (totalQty > 0) cartSummary.classList.remove('hidden');
+        else cartSummary.classList.add('hidden');
     }
 }
-  /** --- 2. LOGIQUE DE FINALISATION --- **/
+
 function nextToFinalization() {
-    // 1. Calcul du total
     const total = monPanier.reduce((acc, item) => acc + (item.qty * item.prix), 0);
-    
-    // 2. Construction du message
     let message = "Détails de la commande :\n";
     monPanier.forEach(p => message += `- ${p.qty} ${p.unit} de ${p.nom} (${(p.qty * p.prix).toLocaleString()} FCFA)\n`);
     message += `\nTOTAL : ${total.toLocaleString()} FCFA`;
 
-    // 3. Sauvegarde temporaire
     localStorage.setItem('message_commande', message);
-
-    // 4. Fermer le panier et OUVRIR la modale de finalisation
     document.getElementById('cartModal').classList.add('hidden');
-    document.getElementById('checkoutModal').classList.remove('hidden'); // ON L'AFFICHE ICI
+    document.getElementById('checkoutModal').classList.remove('hidden');
 }
+
 document.getElementById('finalOrderForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    // 1. Décrémentation du stock
     for (const item of monPanier) {
         let formData = new FormData();
         formData.append('product_id', item.id);
@@ -168,7 +164,6 @@ document.getElementById('finalOrderForm').addEventListener('submit', async funct
         try {
             const response = await fetch('process_order.php', { method: 'POST', body: formData });
             const result = await response.json();
-            
             if (!result.success) {
                 alert("Erreur stock pour " + item.nom + " : " + result.error);
                 return;
@@ -180,91 +175,101 @@ document.getElementById('finalOrderForm').addEventListener('submit', async funct
         }
     }
 
-    // 2. Préparation du message (Calculé une seule fois)
     const total = monPanier.reduce((acc, item) => acc + (item.qty * item.prix), 0);
     let message = "Détails de la commande :\n";
     monPanier.forEach(p => message += `- ${p.qty} ${p.unit} de ${p.nom} (${(p.qty * p.prix).toLocaleString()} FCFA)\n`);
     message += `\nTOTAL : ${total.toLocaleString()} FCFA`;
     
-    // Stockage local pour le formulaire
     localStorage.setItem('message_commande', message);
 
-    // 3. Enregistrement global de la commande via save_order.php
     let finalData = new FormData(this);
-    finalData.append('message', message); // On envoie le texte calculé ici
+    finalData.append('message', message);
+
+    const numComInput = document.getElementById('id_de_votre_input_commercial');
+    if (numComInput) {
+        finalData.append('num_commercial', numComInput.value);
+    }
 
     try {
-        const response = await fetch('save_order.php', {
-            method: 'POST',
-            body: finalData
-        });
-
+        const response = await fetch('save_order.php', { method: 'POST', body: finalData });
         const result = await response.json();
 
         if (result.success) {
-            // Nettoyage final
+            // 1. Réinitialisation du panier et de l'interface
             monPanier = [];
             updateBadge();
             document.getElementById('checkoutModal').classList.add('hidden');
             
-            // Remplissage du champ contact et redirection
+            // 2. Mise à jour de l'ID de commande pour la modale avis
+            const orderIdInput = document.getElementById('order_id');
+            if (orderIdInput) orderIdInput.value = result.order_id;
+            
+            // 3. Remplissage et préparation de la zone de contact
             const textareaContact = document.getElementById('message-commande');
-            if (textareaContact) {
-                textareaContact.value = message;
+            if (textareaContact) textareaContact.value = message;
+            
+            // 4. Vidage des formulaires de contact
+            const contactForm = document.getElementById('contactForm');
+            if (contactForm) contactForm.reset();
+            
+            const responseDiv = document.getElementById('contact-response');
+            if (responseDiv) {
+                responseDiv.innerHTML = ""; 
+                responseDiv.classList.add('hidden');
             }
             
             alert("Commande enregistrée avec succès !");
             window.location.href = '#contact';
-        } else {
+        }else {
             alert("Erreur lors de l'enregistrement : " + result.error);
         }
     } catch (error) {
         console.error("Erreur save_order:", error);
-        alert("Erreur lors de la sauvegarde finale.");
+        alert("Erreur lors de la sauvegarde finale : " + error.message);
     }
 });
-    /** --- 3. UTILITAIRES --- **/
-    function toggleOrderSelector(id) { document.getElementById('selector-container-' + id).classList.toggle('hidden'); }
-    
-    function incrementQuantity(id) {
-        const input = document.getElementById(`quantity-${id}`);
-        input.value = parseInt(input.value) + 1;
-    }
 
-    function decrementQuantity(id) {
-        const input = document.getElementById(`quantity-${id}`);
-        if (parseInt(input.value) > 1) input.value = parseInt(input.value) - 1;
-    }
+function toggleOrderSelector(id) { document.getElementById('selector-container-' + id).classList.toggle('hidden'); }
+function incrementQuantity(id) { document.getElementById(`quantity-${id}`).value = parseInt(document.getElementById(`quantity-${id}`).value) + 1; }
+function decrementQuantity(id) {
+    const input = document.getElementById(`quantity-${id}`);
+    if (parseInt(input.value) > 1) input.value = parseInt(input.value) - 1;
+}
+
 window.addEventListener('hashchange', () => {
     if (window.location.hash === '#contact') {
         const msg = localStorage.getItem('message_commande');
         const textarea = document.getElementById('message-commande');
-        if (msg && textarea) textarea.value = msg;
+        
+        if (msg && textarea) {
+            textarea.value = msg;
+            localStorage.removeItem('message_commande'); // On vide ici aussi
+        }
     }
 });
-    // Initialisation
-    document.addEventListener("DOMContentLoaded", () => {
-        // Pré-remplissage sur la page contact
-        const msg = localStorage.getItem('message_commande');
-        const textarea = document.getElementById('message-commande');
-        if (msg && textarea) textarea.value = msg;
-    });
-// Initialisation : Vérifier si l'utilisateur a déjà réussi le jeu
 document.addEventListener("DOMContentLoaded", () => {
-    if (sessionStorage.getItem('isHuman') === 'true') {
-        document.getElementById('game-shield').style.display = 'none';
+    // 1. Gestion du message de commande
+    const msg = localStorage.getItem('message_commande');
+    const textarea = document.getElementById('message-commande');
+    
+    if (msg && textarea) {
+        textarea.value = msg;
+        // On supprime la clé après l'avoir utilisée pour éviter le remplissage au rechargement
+        localStorage.removeItem('message_commande'); 
     }
-});
 
-// 1. Logique du Jeu et Cookies
-document.addEventListener("DOMContentLoaded", () => {
-    // Vérif jeu
+    // 2. Vérification du jeu (Human check)
     if (sessionStorage.getItem('isHuman') === 'true') {
-        document.getElementById('game-shield').style.display = 'none';
+        const shield = document.getElementById('game-shield');
+        if(shield) shield.style.display = 'none';
     }
-    // Vérif cookies
+
+    // 3. Gestion des cookies
     if (!localStorage.getItem('cookiesAccepted')) {
-        setTimeout(() => { document.getElementById('cookie-banner').classList.remove('hidden'); }, 2000);
+        setTimeout(() => { 
+            const cb = document.getElementById('cookie-banner'); 
+            if(cb) cb.classList.remove('hidden'); 
+        }, 2000);
     }
 });
 
@@ -289,12 +294,103 @@ function failGame() {
     setTimeout(() => { msg.style.transform = 'translateX(0)'; }, 100);
     setTimeout(() => { msg.classList.add('hidden'); }, 2000);
 }
+
 function toggleModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.toggle('hidden');
         modal.classList.toggle('flex');
-    } else {
-        console.warn("La modale avec l'ID " + modalId + " n'a pas été trouvée.");
+    }
+}
+
+function setRating(note) {
+    currentNote = note;
+    const stars = document.querySelectorAll('#star-rating span');
+    stars.forEach((star, index) => {
+        if (star) {
+            star.style.color = index < note ? '#F8D64E' : '#D1D5DB';
+        }
+    });
+}
+// 1. Fonction pour ouvrir la modale
+function openRecrutementModal() {
+    document.getElementById('recrutementModal').classList.remove('hidden');
+}
+
+// 2. Fonction pour mettre à jour le nom du fichier sélectionné (votre besoin UI)
+function updateFileName(labelId, input) {
+    const label = document.getElementById(labelId);
+    if (input.files.length > 0) {
+        label.querySelector('span').innerText = input.files[0].name;
+        label.classList.add('border-green-500', 'bg-green-50');
+    }
+}
+
+// 3. Gestion de l'envoi du formulaire (Ajax)
+document.getElementById('recrutementForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = document.getElementById('submitBtn');
+    
+    submitBtn.innerText = "Envoi en cours...";
+    submitBtn.disabled = true;
+
+    fetch('traitement_recrutement.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('recrutementForm').classList.add('hidden');
+            document.getElementById('successMessage').classList.remove('hidden');
+        } else {
+            alert("Erreur : " + data.message);
+            submitBtn.innerText = "Envoyer le dossier";
+            submitBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert("Une erreur est survenue lors de l'envoi.");
+        submitBtn.innerText = "Envoyer le dossier";
+        submitBtn.disabled = false;
+    });
+});
+async function envoyerAvisFinal() {
+    const orderIdInput = document.getElementById('order_id');
+    
+    if (!orderIdInput || !orderIdInput.value) {
+        alert("Erreur : ID de commande manquant.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('note', currentNote);
+    formData.append('order_id', orderIdInput.value);
+
+    try {
+        const response = await fetch('traitement_avis.php', { method: 'POST', body: formData });
+        const result = await response.json();
+        
+        if(result.success) {
+            alert("Merci pour votre retour !");
+            
+            // --- NOUVEAU : Animation de fermeture ---
+            const modal = document.getElementById('ratingModal');
+            if(modal) {
+                modal.classList.add('fade-out'); // Déclenche l'animation
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');    // Masque définitivement
+                    modal.classList.remove('fade-out'); // Nettoie la classe pour la prochaine fois
+                }, 500); // Doit correspondre à la durée du CSS (0.5s)
+            }
+        } else {
+            alert("Erreur : " + result.error);
+        }
+    } catch(err) {
+        console.error("Erreur réseau :", err);
     }
 }
