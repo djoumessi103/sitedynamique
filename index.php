@@ -154,31 +154,37 @@ $photos = $queryGallery->fetchAll();
                         <i class="fas fa-phone-alt"></i> <span>Contact</span>
                     </a>
                 </div>
-                <button id="menu-btn" class="md:hidden text-2xl text-galaDark focus:outline-none">
-                    <i class="fas fa-bars-staggered"></i>
-                </button>
+                <button id="menu-btn" class="md:hidden text-2xl text-galaDark focus:outline-none relative z-[99999]">
+    <i class="fas fa-bars-staggered"></i>
+</button>
             </div>
         </div>
+    <!-- MOBILE MENU PUBLIC - STYLE MODERNISÉ -->
+<div id="mobile-nav" class="fixed top-20 left-4 right-4 bg-white/90 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl md:hidden z-40 overflow-hidden transform transition-all duration-300 scale-95 opacity-0 pointer-events-none p-3">
+    <div class="flex flex-col gap-1">
+        <!-- Liens avec le style "Floating" -->
+        <a href="#accueil" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-home text-lg"></i> Accueil
+        </a>
+        <a href="#a-propos" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-history text-lg"></i> Notre Histoire
+        </a>
+        <a href="#gamme" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-box text-lg"></i> Nos Produits
+        </a>
+        <a href="#qualite" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-award text-lg"></i> Qualité
+        </a>
+        <a href="#galerie" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-photo text-lg"></i> Galerie
+        </a>
         
-        <div id="mobile-nav" class="fixed top-20 left-4 right-4 bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl shadow-slate-200/50 rounded-3xl md:hidden z-40 overflow-hidden transform transition-all duration-300 scale-95 opacity-0 pointer-events-none">
-    <div class="flex flex-col p-4 gap-1">
-        <a href="#accueil" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-home text-xl"></i> Accueil
-        </a>
-        <a href="#a-propos" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-history text-xl"></i> Notre Histoire
-        </a>
-        <a href="#gamme" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-box text-xl"></i> Nos Produits
-        </a>
-        <a href="#qualite" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-award text-xl"></i> Qualité
-        </a>
-        <a href="#galerie" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-photo text-xl"></i> Galerie
-        </a>
-        <a href="#contact" class="mobile-link flex items-center gap-4 p-4 mt-2 rounded-2xl bg-orange text-white font-bold shadow-lg shadow-orange/20">
-            <i class="ti ti-messages text-xl"></i> Contactez-nous
+        <!-- Séparateur visuel -->
+        <div class="border-t border-slate-100 my-1"></div>
+        
+        <!-- Bouton CTA -->
+        <a href="#contact" class="mobile-link flex items-center justify-center gap-4 p-3 rounded-xl bg-orange text-white font-bold shadow-lg shadow-orange/20 hover:bg-orange/90 transition-all">
+            <i class="ti ti-messages text-lg"></i> Contactez-nous
         </a>
     </div>
 </div>
@@ -675,4 +681,26 @@ $photos = $queryGallery->fetchAll();
 </div>
 </div>
 </body>
+<script>
+    (function() {
+        const btn = document.querySelector('#menu-btn');
+        const nav = document.querySelector('#mobile-nav');
+
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault(); // Annule le comportement par défaut
+                e.stopPropagation(); // Empêche la propagation du clic
+                
+                if (nav) {
+                    nav.classList.toggle('opacity-0');
+                    nav.classList.toggle('opacity-100');
+                    nav.classList.toggle('pointer-events-none');
+                    nav.classList.toggle('scale-95');
+                    nav.classList.toggle('scale-100');
+                    console.log("Clic forcé avec succès");
+                }
+            }, true); // Le 'true' ici force l'écoute sur la phase de capture
+        }
+    })();
+</script>
 </html>
