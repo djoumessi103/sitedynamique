@@ -453,7 +453,7 @@ $photos = $queryGallery->fetchAll();
                         </li>
                     </ul>
                     <div class="pt-6 text-center md:text-left">
-                        <a href="https://wa.me/237656876238" class="inline-flex items-center px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
+                        <a href="https://wa.me/2376 676 588 240" class="inline-flex items-center px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
                             <i class="fab fa-whatsapp mr-3 text-2xl"></i> Devenir Grossiste
                         </a>
                     </div>
@@ -632,33 +632,35 @@ $photos = $queryGallery->fetchAll();
         </div>
     </div>
     <script src="assets/js/script.js"></script>
-    <button onclick="document.getElementById('ratingModal').classList.remove('hidden')" 
-        class="bg-blue-500 text-white p-4 rounded-xl fixed bottom-4 right-4 z-[999]">
-    Tester la modale avis
-</button>
-    <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300">
-        <div class="text-4xl mb-4">💬</div>
-        <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
-        <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>
-        
-        <div id="star-rating" class="flex justify-center gap-3 text-3xl mb-8">
-            <span onclick="setRating(1)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-            <span onclick="setRating(2)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-            <span onclick="setRating(3)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-            <span onclick="setRating(4)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-            <span onclick="setRating(5)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-        </div>
-        
-        <input type="hidden" id="order_id" value="">
-        <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
-<input type="hidden" id="order_id" value="">
 
-        <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
-            Valider mon avis
-        </button>
+    <button type="button" onclick="openRatingModal()"
+        class="bg-blue-500 text-white p-4 rounded-xl fixed bottom-4 right-4 z-[999]">
+        Tester la modale avis
+    </button>
+
+    <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300 relative">
+            <button type="button" onclick="closeRatingModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl">×</button>
+            <div class="text-4xl mb-4">💬</div>
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
+            <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>
+            
+            <div id="star-rating" class="flex justify-center gap-3 text-3xl mb-8">
+                <span onclick="setRating(1)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+                <span onclick="setRating(2)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+                <span onclick="setRating(3)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+                <span onclick="setRating(4)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+                <span onclick="setRating(5)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            </div>
+            
+            <input type="hidden" id="order_id" value="">
+            <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
+
+            <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
+                Valider mon avis
+            </button>
+        </div>
     </div>
-</div>
 </div>
 </body>
 </html>
