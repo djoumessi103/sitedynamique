@@ -189,6 +189,9 @@ if (isset($_POST['ajax_decrement_id'])) {
             <a href="messages.php" class="p-2.5 text-lg text-slate-500 hover:text-galaGreen"><i class="fas fa-envelope"></i></a>
             <a href="products_manager.php" class="p-2.5 text-lg text-white bg-galaGreen rounded-xl shadow-sm"><i class="fas fa-box"></i></a>
             <a href="gallery.php" class="p-2.5 text-lg text-slate-500 hover:text-galaGreen"><i class="fas fa-images"></i></a>
+              <a href="voir_candidatures.php" class="p-2 text-lg rounded-xl transition <?= ($current_page == 'voir_candidatures.php') ? 'bg-galaGreen text-white shadow-sm' : 'text-slate-700' ?>"><i class="fas fa-users"></i></a>
+        <a href="admin_commandes.php" class="p-2 text-lg rounded-xl transition <?= ($current_page == 'admin_commandes.php') ? 'bg-galaGreen text-white shadow-sm' : 'text-slate-700' ?>"><i class="fas fa-shopping-cart"></i></a>
+        <a href="http://localhost/sitedynamique/index.php#accueil" class="p-2 text-lg text-[#E30613] rounded-xl hover:bg-black/5 transition"><i class="fas fa-globe"></i></a>
             <a href="logout.php" class="p-2.5 text-lg text-rose-600"><i class="fas fa-sign-out-alt"></i></a>
         </div>
     </div>

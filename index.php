@@ -160,16 +160,28 @@ $photos = $queryGallery->fetchAll();
             </div>
         </div>
         
-        <div id="mobile-nav" class="absolute top-16 left-0 w-full bg-white shadow-2xl md:hidden border-t border-slate-50 z-40">
-            <div class="flex flex-col p-6 gap-6 font-bold text-lg text-slate-700">
-                <a id="link-mobile-accueil" href="#accueil" class="mobile-link">Accueil</a>
-                <a id="link-mobile-histoire" href="#a-propos" class="mobile-link">Notre Histoire</a>
-                <a id="link-mobile-produits" href="#gamme" class="mobile-link">Nos Produits</a>
-                <a id="link-mobile-qualite" href="#qualite" class="mobile-link">Qualité</a>
-                <a id="link-mobile-contact" href="#contact" class="mobile-link">Contact</a>
-                <a id="link-mobile-galerie" href="#galerie" class="mobile-link">Galerie</a>
-            </div>
-        </div>
+        <div id="mobile-nav" class="fixed top-20 left-4 right-4 bg-white/80 backdrop-blur-xl border border-white/20 shadow-2xl shadow-slate-200/50 rounded-3xl md:hidden z-40 overflow-hidden transform transition-all duration-300 scale-95 opacity-0 pointer-events-none">
+    <div class="flex flex-col p-4 gap-1">
+        <a href="#accueil" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-home text-xl"></i> Accueil
+        </a>
+        <a href="#a-propos" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-history text-xl"></i> Notre Histoire
+        </a>
+        <a href="#gamme" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-box text-xl"></i> Nos Produits
+        </a>
+        <a href="#qualite" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-award text-xl"></i> Qualité
+        </a>
+        <a href="#galerie" class="mobile-link flex items-center gap-4 p-4 rounded-2xl hover:bg-orange-l transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
+            <i class="ti ti-photo text-xl"></i> Galerie
+        </a>
+        <a href="#contact" class="mobile-link flex items-center gap-4 p-4 mt-2 rounded-2xl bg-orange text-white font-bold shadow-lg shadow-orange/20">
+            <i class="ti ti-messages text-xl"></i> Contactez-nous
+        </a>
+    </div>
+</div>
     </nav>
 
     <section id="accueil" class="relative pt-32 pb-20 bg-gradient-to-br from-green-50/50 via-white to-orange-50/30 overflow-hidden">
@@ -633,34 +645,34 @@ $photos = $queryGallery->fetchAll();
     </div>
     <script src="assets/js/script.js"></script>
 
-    <button type="button" onclick="openRatingModal()"
+    <button type="button" onclick="document.getElementById('ratingModal').classList.remove('hidden')"
         class="bg-blue-500 text-white p-4 rounded-xl fixed bottom-4 right-4 z-[999]">
         Tester la modale avis
     </button>
 
-    <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300 relative">
-            <button type="button" onclick="closeRatingModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl">×</button>
-            <div class="text-4xl mb-4">💬</div>
-            <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
-            <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>
-            
-            <div id="star-rating" class="flex justify-center gap-3 text-3xl mb-8">
-                <span onclick="setRating(1)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-                <span onclick="setRating(2)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-                <span onclick="setRating(3)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-                <span onclick="setRating(4)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-                <span onclick="setRating(5)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
-            </div>
-            
-            <input type="hidden" id="order_id" value="">
-            <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
-
-            <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
-                Valider mon avis
-            </button>
+    <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300">
+        <div class="text-4xl mb-4">💬</div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
+        <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>
+        
+        <div id="star-rating" class="flex justify-center gap-3 text-3xl mb-8">
+            <span onclick="setRating(1)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(2)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(3)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(4)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
+            <span onclick="setRating(5)" class="cursor-pointer text-gray-300 hover:scale-110 transition">★</span>
         </div>
+        
+        <input type="hidden" id="order_id" value="">
+        <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
+<input type="hidden" id="order_id" value="">
+
+        <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
+            Valider mon avis
+        </button>
     </div>
+</div>
 </div>
 </body>
 </html>

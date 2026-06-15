@@ -18,15 +18,24 @@ document.getElementById('contactForm').addEventListener('submit', function(e) {
         btn.disabled = false;
         btn.innerText = "Envoyer le message";
 
+        // Dans votre bloc contactForm (result.ok) :
         if (result) {
             responseDiv.innerHTML = result.text;
             responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-green-100 text-green-700 block";
             this.reset();
 
-            setTimeout(() => {
-                openRatingModal();
-            }, 800);
-
+            // Vérifie si l'avis a déjà été demandé durant cette session
+            if (!sessionStorage.getItem('avisDejaDemande')) {
+                setTimeout(() => {
+                    const modal = document.getElementById('ratingModal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        // On marque l'avis comme "déjà demandé" pour cette session
+                        
+                    }
+                }, 1000);
+            }
+            // Disparition du message de succès
             setTimeout(() => {
                 responseDiv.classList.add('hidden');
                 responseDiv.innerHTML = "";
@@ -211,9 +220,6 @@ document.getElementById('finalOrderForm').addEventListener('submit', async funct
             
             alert("Commande enregistrée avec succès !");
             window.location.href = '#contact';
-            setTimeout(() => {
-                openRatingModal(result.order_id);
-            }, 600);
         }else {
             alert("Erreur lors de l'enregistrement : " + result.error);
         }
@@ -297,35 +303,6 @@ function toggleModal(modalId) {
     }
 }
 
-function openRatingModal(orderId = null) {
-    const modal = document.getElementById('ratingModal');
-    const orderIdInput = document.getElementById('order_id');
-    const nomClientInput = document.getElementById('nom_client');
-
-    if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    }
-
-    if (orderIdInput && orderId) {
-        orderIdInput.value = orderId;
-    }
-
-    if (nomClientInput) {
-        nomClientInput.value = '';
-    }
-
-    setRating(5);
-}
-
-function closeRatingModal() {
-    const modal = document.getElementById('ratingModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
-}
-
 function setRating(note) {
     currentNote = note;
     const stars = document.querySelectorAll('#star-rating span');
@@ -399,7 +376,17 @@ async function envoyerAvisFinal() {
         
         if(result.success) {
             alert("Merci pour votre retour !");
-            closeRatingModal();
+            
+            // --- NOUVEAU : Animation de fermeture ---
+            const modal = document.getElementById('ratingModal');
+            if(modal) {
+                modal.classList.add('fade-out'); // Déclenche l'animation
+                
+                setTimeout(() => {
+                    modal.classList.add('hidden');    // Masque définitivement
+                    modal.classList.remove('fade-out'); // Nettoie la classe pour la prochaine fois
+                }, 500); // Doit correspondre à la durée du CSS (0.5s)
+            }
         } else {
             alert("Erreur : " + result.error);
         }
