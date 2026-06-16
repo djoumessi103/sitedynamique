@@ -59,8 +59,228 @@ $photos = $queryGallery->fetchAll();
 
     <style>
         .glass-morphism { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
-        #mobile-nav { transition: all 0.3s ease-in-out; transform: translateY(-10px); opacity: 0; pointer-events: none; }
-        #mobile-nav.active { transform: translateY(0); opacity: 1; pointer-events: auto; }
+        /* ══════════════════════════════════════════
+           HAMBURGER BUTTON — 2026 EDITION
+        ══════════════════════════════════════════ */
+        #menu-btn {
+            position: relative;
+            width: 42px; height: 42px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 5px;
+            background: rgba(0,122,61,0.06);
+            border: 1.5px solid rgba(0,122,61,0.12);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.25s, border-color 0.25s, transform 0.15s;
+            overflow: hidden;
+        }
+        @media (min-width: 1024px) {
+            #menu-btn { display: none !important; }
+            #mobile-nav, #nav-overlay { display: none !important; }
+        }
+        #menu-btn::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at center, rgba(0,122,61,0.15) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #menu-btn:active::after { opacity: 1; }
+        #menu-btn:active { transform: scale(0.93); }
+        #menu-btn.open {
+            background: rgba(0,122,61,0.1);
+            border-color: rgba(0,122,61,0.25);
+        }
+        .bar {
+            display: block;
+            height: 2px; border-radius: 99px;
+            background: #007A3D;
+            transform-origin: center;
+            transition: transform 0.45s cubic-bezier(0.23,1,0.32,1),
+                        opacity 0.3s ease, width 0.35s cubic-bezier(0.23,1,0.32,1);
+        }
+        .bar:nth-child(1) { width: 20px; }
+        .bar:nth-child(2) { width: 14px; align-self: flex-start; margin-left: 9px; }
+        .bar:nth-child(3) { width: 18px; }
+        #menu-btn.open .bar:nth-child(1) { width: 20px; transform: translateY(7px) rotate(45deg); }
+        #menu-btn.open .bar:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        #menu-btn.open .bar:nth-child(3) { width: 20px; transform: translateY(-7px) rotate(-45deg); }
+
+        /* ══════════════════════════════════════════
+           OVERLAY
+        ══════════════════════════════════════════ */
+        #nav-overlay {
+            position: fixed; inset: 0; z-index: 8997;
+            background: transparent;
+            pointer-events: none;
+            transition: background 0.45s ease;
+        }
+        #nav-overlay.active {
+            background: rgba(2, 6, 23, 0.65);
+            pointer-events: auto;
+        }
+
+        /* ══════════════════════════════════════════
+           MOBILE NAV DRAWER — FULL PREMIUM 2026
+        ══════════════════════════════════════════ */
+        #mobile-nav {
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: min(88vw, 340px);
+            z-index: 8999;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            transform: translateX(105%);
+            transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1);
+
+            background: #ffffff;
+            border-left: 1px solid #f1f5f9;
+        }
+        #mobile-nav::before { display: none; }
+        #mobile-nav > * { position: relative; z-index: 1; }
+        #mobile-nav.active { transform: translateX(0); }
+
+        /* ── Header ── */
+        .mnh {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 52px 22px 18px;
+        }
+        .mnh-brand { display: flex; align-items: center; gap: 10px; }
+        .mnh-logo {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(135deg, #007A3D, #059669);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 900; font-size: 16px;
+            box-shadow: 0 4px 14px rgba(0,122,61,0.5);
+        }
+        .mnh-name { font-size: 1.05rem; font-weight: 900; color: #007A3D; letter-spacing: -0.01em; }
+        .mnh-name span { color: #E30613; }
+        .mnh-tag {
+            font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em;
+            color: #94a3b8; text-transform: uppercase;
+            margin-top: 1px;
+        }
+        .mnh-close {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: center;
+            color: #64748b; font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, transform 0.15s;
+        }
+        .mnh-close:active { background: #e2e8f0; color: #007A3D; transform: scale(0.92); }
+
+        /* ── Divider ── */
+        .mn-divider {
+            height: 1px; margin: 0 22px 6px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+        }
+
+        /* ── Nav Body ── */
+        .mn-body { flex: 1; overflow-y: auto; padding: 8px 14px; scrollbar-width: none; }
+        .mn-body::-webkit-scrollbar { display: none; }
+
+        .mn-section-label {
+            font-size: 0.6rem; font-weight: 800; letter-spacing: 0.2em;
+            color: #94a3b8; text-transform: uppercase;
+            padding: 10px 10px 6px;
+        }
+
+        .mn-link {
+            display: flex; align-items: center; gap: 14px;
+            padding: 13px 14px; border-radius: 16px;
+            text-decoration: none; margin-bottom: 3px;
+            color: #334155;
+            font-weight: 600; font-size: 0.92rem;
+            position: relative; overflow: hidden;
+            opacity: 0; transform: translateX(28px);
+            transition: color 0.2s, background 0.25s,
+                        opacity 0.4s ease, transform 0.4s cubic-bezier(0.23,1,0.32,1);
+        }
+        .mn-link::before {
+            content: '';
+            position: absolute; left: 0; top: 0; bottom: 0;
+            width: 3px; border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, #007A3D, #059669);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .mn-link:hover, .mn-link:active { background: #f0fdf4; color: #007A3D; }
+        .mn-link:hover::before { opacity: 1; }
+        .mn-link:active { transform: scale(0.97) !important; }
+
+        .mn-icon {
+            width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            transition: background 0.25s, border-color 0.25s;
+        }
+        .mn-link:hover .mn-icon {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+        }
+        .mn-link-text { flex: 1; }
+        .mn-link-sub {
+            display: block; font-size: 0.68rem;
+            color: #94a3b8; font-weight: 500; margin-top: 1px;
+        }
+        .mn-arrow {
+            font-size: 11px; color: #cbd5e1;
+            transition: transform 0.2s, color 0.2s;
+        }
+        .mn-link:hover .mn-arrow { transform: translateX(4px); color: #007A3D; }
+
+        .mn-badge {
+            font-size: 0.58rem; font-weight: 800; letter-spacing: 0.05em;
+            padding: 2px 7px; border-radius: 99px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: #fff; text-transform: uppercase;
+        }
+
+        /* Stagger animation on open */
+        #mobile-nav.active .mn-link { opacity: 1; transform: translateX(0); }
+        #mobile-nav.active .mn-link:nth-child(1) { transition-delay: 0.06s; }
+        #mobile-nav.active .mn-link:nth-child(2) { transition-delay: 0.11s; }
+        #mobile-nav.active .mn-link:nth-child(3) { transition-delay: 0.16s; }
+        #mobile-nav.active .mn-link:nth-child(4) { transition-delay: 0.21s; }
+        #mobile-nav.active .mn-link:nth-child(5) { transition-delay: 0.26s; }
+
+        /* ── Footer ── */
+        .mn-footer { padding: 14px 14px 40px; }
+        .mn-footer-divider {
+            height: 1px; margin-bottom: 14px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+        }
+        .mn-cta {
+            display: flex; align-items: center; justify-content: center;
+            gap: 10px; padding: 16px 20px; border-radius: 16px;
+            background: linear-gradient(135deg, #007A3D 0%, #00a855 100%);
+            color: #fff; font-weight: 800; font-size: 0.88rem;
+            text-decoration: none; letter-spacing: 0.04em;
+            box-shadow: 0 8px 28px rgba(0,122,61,0.45), 0 0 0 1px rgba(0,255,128,0.1) inset;
+            opacity: 0; transform: translateY(10px);
+            transition: opacity 0.4s ease 0.3s, transform 0.4s cubic-bezier(0.23,1,0.32,1) 0.3s,
+                        box-shadow 0.25s, scale 0.15s;
+        }
+        #mobile-nav.active .mn-cta { opacity: 1; transform: translateY(0); }
+        .mn-cta:active { scale: 0.97; box-shadow: 0 4px 14px rgba(0,122,61,0.3); }
+
+        .mn-brand-strip {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            margin-top: 14px;
+            opacity: 0;
+            transition: opacity 0.4s ease 0.38s;
+        }
+        #mobile-nav.active .mn-brand-strip { opacity: 1; }
+        .mn-brand-strip span {
+            font-size: 0.6rem; font-weight: 700; letter-spacing: 0.15em;
+            color: #94a3b8; text-transform: uppercase;
+        }
+        .mn-brand-dot { width: 3px; height: 3px; border-radius: 50%; background: #cbd5e1; }
         
         .img-container {
             position: relative;
@@ -154,41 +374,104 @@ $photos = $queryGallery->fetchAll();
                         <i class="fas fa-phone-alt"></i> <span>Contact</span>
                     </a>
                 </div>
-                <button id="menu-btn" class="md:hidden text-2xl text-galaDark focus:outline-none relative z-[99999]">
-    <i class="fas fa-bars-staggered"></i>
-</button>
+          <button id="menu-btn" class="flex lg:hidden focus:outline-none" aria-label="Menu">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+          </button>
             </div>
         </div>
-    <!-- MOBILE MENU PUBLIC - STYLE MODERNISÉ -->
-<div id="mobile-nav" class="fixed top-20 left-4 right-4 bg-white/90 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl md:hidden z-40 overflow-hidden transform transition-all duration-300 scale-95 opacity-0 pointer-events-none p-3">
-    <div class="flex flex-col gap-1">
-        <!-- Liens avec le style "Floating" -->
-        <a href="#accueil" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-home text-lg"></i> Accueil
-        </a>
-        <a href="#a-propos" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-history text-lg"></i> Notre Histoire
-        </a>
-        <a href="#gamme" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-box text-lg"></i> Nos Produits
-        </a>
-        <a href="#qualite" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-award text-lg"></i> Qualité
-        </a>
-        <a href="#galerie" class="mobile-link flex items-center gap-4 p-3 rounded-xl hover:bg-orange/10 transition-all duration-300 text-slate-700 hover:text-orange font-semibold">
-            <i class="ti ti-photo text-lg"></i> Galerie
-        </a>
-        
-        <!-- Séparateur visuel -->
-        <div class="border-t border-slate-100 my-1"></div>
-        
-        <!-- Bouton CTA -->
-        <a href="#contact" class="mobile-link flex items-center justify-center gap-4 p-3 rounded-xl bg-orange text-white font-bold shadow-lg shadow-orange/20 hover:bg-orange/90 transition-all">
-            <i class="ti ti-messages text-lg"></i> Contactez-nous
-        </a>
-    </div>
-</div>
+    
     </nav>
+    <!-- OVERLAY -->
+    <div id="nav-overlay"></div>
+
+    <!-- ══ MOBILE NAV — 2026 PREMIUM ══ -->
+    <div id="mobile-nav" aria-hidden="true">
+
+        <!-- Header -->
+        <div class="mnh">
+            <div class="mnh-brand">
+                <div class="mnh-logo">G</div>
+                <div>
+                    <div class="mnh-name">Gala<span>Mayo</span></div>
+                    <div class="mnh-tag">Cameroun · ISO 22000</div>
+                </div>
+            </div>
+            <button class="mnh-close" id="nav-close-btn" aria-label="Fermer">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="mn-divider"></div>
+
+        <!-- Links -->
+        <div class="mn-body">
+            <div class="mn-section-label">Navigation</div>
+
+            <a href="#accueil" class="mn-link">
+                <span class="mn-icon" style="color:#007A3D"><i class="fas fa-home"></i></span>
+                <span class="mn-link-text">
+                    Accueil
+                    <span class="mn-link-sub">Page principale</span>
+                </span>
+                <i class="fas fa-chevron-right mn-arrow"></i>
+            </a>
+
+            <a href="#a-propos" class="mn-link">
+                <span class="mn-icon" style="color:#059669"><i class="fas fa-leaf"></i></span>
+                <span class="mn-link-text">
+                    Notre Histoire
+                    <span class="mn-link-sub">Depuis Douala, Cameroun</span>
+                </span>
+                <i class="fas fa-chevron-right mn-arrow"></i>
+            </a>
+
+            <a href="#gamme" class="mn-link">
+                <span class="mn-icon" style="color:#d97706"><i class="fas fa-box-open"></i></span>
+                <span class="mn-link-text">
+                    Nos Produits
+                    <span class="mn-link-sub">Toute la gamme Gala</span>
+                </span>
+                <span class="mn-badge">Nouveau</span>
+            </a>
+
+            <a href="#qualite" class="mn-link">
+                <span class="mn-icon" style="color:#6366f1"><i class="fas fa-award"></i></span>
+                <span class="mn-link-text">
+                    Qualité
+                    <span class="mn-link-sub">Normes ISO & hygiène</span>
+                </span>
+                <i class="fas fa-chevron-right mn-arrow"></i>
+            </a>
+
+            <a href="#galerie" class="mn-link">
+                <span class="mn-icon" style="color:#db2777"><i class="fas fa-images"></i></span>
+                <span class="mn-link-text">
+                    Galerie
+                    <span class="mn-link-sub">Nos photos & productions</span>
+                </span>
+                <i class="fas fa-chevron-right mn-arrow"></i>
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <div class="mn-footer">
+            <div class="mn-footer-divider"></div>
+            <a href="#contact" class="mn-cta">
+                <i class="fas fa-phone-alt"></i>
+                Contactez-nous
+            </a>
+            <div class="mn-brand-strip">
+                <span>Gala Agro SARL</span>
+                <div class="mn-brand-dot"></div>
+                <span>© 2026</span>
+                <div class="mn-brand-dot"></div>
+                <span>Cameroun</span>
+            </div>
+        </div>
+
+    </div>
 
     <section id="accueil" class="relative pt-32 pb-20 bg-gradient-to-br from-green-50/50 via-white to-orange-50/30 overflow-hidden">
         <div class="max-w-7xl mx-auto px-5 flex flex-col md:flex-row items-center relative">
@@ -651,10 +934,7 @@ $photos = $queryGallery->fetchAll();
     </div>
     <script src="assets/js/script.js"></script>
 
-    <button type="button" onclick="document.getElementById('ratingModal').classList.remove('hidden')"
-        class="bg-blue-500 text-white p-4 rounded-xl fixed bottom-4 right-4 z-[999]">
-        Tester la modale avis
-    </button>
+
 
     <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300">
@@ -672,7 +952,6 @@ $photos = $queryGallery->fetchAll();
         
         <input type="hidden" id="order_id" value="">
         <input type="text" id="nom_client" placeholder="Votre nom" class="w-full mb-3 p-2 border rounded">
-<input type="hidden" id="order_id" value="">
 
         <button onclick="envoyerAvisFinal()" class="w-full bg-[#25D366] text-white py-3 rounded-full font-bold hover:bg-[#128C7E] transition">
             Valider mon avis
@@ -682,25 +961,74 @@ $photos = $queryGallery->fetchAll();
 </div>
 </body>
 <script>
-    (function() {
-        const btn = document.querySelector('#menu-btn');
-        const nav = document.querySelector('#mobile-nav');
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn      = document.getElementById('menu-btn');
+        const nav      = document.getElementById('mobile-nav');
+        const overlay  = document.getElementById('nav-overlay');
+        const closeBtn = document.getElementById('nav-close-btn');
 
-        if (btn) {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault(); // Annule le comportement par défaut
-                e.stopPropagation(); // Empêche la propagation du clic
-                
-                if (nav) {
-                    nav.classList.toggle('opacity-0');
-                    nav.classList.toggle('opacity-100');
-                    nav.classList.toggle('pointer-events-none');
-                    nav.classList.toggle('scale-95');
-                    nav.classList.toggle('scale-100');
-                    console.log("Clic forcé avec succès");
-                }
-            }, true); // Le 'true' ici force l'écoute sur la phase de capture
+        function openMenu() {
+            nav.classList.add('active');
+            overlay.classList.add('active');
+            btn.classList.add('open');
+            nav.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
         }
-    })();
+        function closeMenu() {
+            nav.classList.remove('active');
+            overlay.classList.remove('active');
+            btn.classList.remove('open');
+            nav.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            nav.classList.contains('active') ? closeMenu() : openMenu();
+        });
+
+        closeBtn.addEventListener('click', closeMenu);
+        overlay.addEventListener('click', closeMenu);
+
+        nav.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', closeMenu);
+        });
+
+        // ═══════════════════════════════════════════════
+        // AFFICHER LE MODAL AVIS APRÈS ENVOI COMMANDE
+        // ═══════════════════════════════════════════════
+        const contactForm = document.getElementById('contactForm');
+        const contactResponse = document.getElementById('contact-response');
+
+        if (contactForm) {
+            contactForm.addEventListener('submit', function() {
+                // Pré-remplir le nom dans le modal avis
+                const nomInput = contactForm.querySelector('input[name="nom"]');
+                if (nomInput && nomInput.value.trim()) {
+                    const nomClientInput = document.getElementById('nom_client');
+                    if (nomClientInput) nomClientInput.value = nomInput.value.trim();
+                }
+
+                // Observer la div de réponse pour détecter le succès AJAX
+                if (contactResponse) {
+                    const observer = new MutationObserver(() => {
+                        // Dès que la réponse apparaît (succès ou non), on affiche le modal
+                        if (!contactResponse.classList.contains('hidden')) {
+                            observer.disconnect();
+                            setTimeout(() => {
+                                document.getElementById('ratingModal').classList.remove('hidden');
+                            }, 1200);
+                        }
+                    });
+                    observer.observe(contactResponse, { attributes: true, attributeFilter: ['class'] });
+                } else {
+                    // Fallback si pas de div réponse
+                    setTimeout(() => {
+                        document.getElementById('ratingModal').classList.remove('hidden');
+                    }, 1000);
+                }
+            });
+        }
+    });
 </script>
 </html>
