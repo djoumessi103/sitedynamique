@@ -23,6 +23,7 @@ document.getElementById('contactForm').addEventListener('submit', function(e) {
             responseDiv.innerHTML = result.text;
             responseDiv.className = "mb-6 p-4 rounded-xl text-center font-bold bg-green-100 text-green-700 block";
             this.reset();
+            unlockMessageField(false); // Message envoyé : le champ redevient libre pour un futur message
 
             // Vérifie si l'avis a déjà été demandé durant cette session
             if (!sessionStorage.getItem('avisDejaDemande')) {
@@ -55,6 +56,32 @@ document.getElementById('contactForm').addEventListener('submit', function(e) {
 
 let monPanier = [];
 let currentNote = 5; // Initialisation sécurisée
+
+// ══════════════════════════════════════════════════════
+// Verrouillage du champ "Détails de la commande"
+// (rempli automatiquement pendant la finalisation de commande)
+// ══════════════════════════════════════════════════════
+function lockMessageField(message) {
+    const textarea = document.getElementById('message-commande');
+    const hint = document.getElementById('message-commande-lock-hint');
+    if (!textarea) return;
+    textarea.value = message;
+    textarea.setAttribute('readonly', 'readonly');
+    textarea.classList.add('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+    textarea.classList.remove('bg-slate-50');
+    if (hint) hint.classList.remove('hidden');
+}
+
+function unlockMessageField(clear = true) {
+    const textarea = document.getElementById('message-commande');
+    const hint = document.getElementById('message-commande-lock-hint');
+    if (!textarea) return;
+    textarea.removeAttribute('readonly');
+    textarea.classList.remove('bg-slate-100', 'text-slate-500', 'cursor-not-allowed');
+    textarea.classList.add('bg-slate-50');
+    if (clear) textarea.value = '';
+    if (hint) hint.classList.add('hidden');
+}
 
 async function checkStockAndSubmit(id, nom, prix) {
     const input = document.getElementById('quantity-' + id);
@@ -149,8 +176,15 @@ function nextToFinalization() {
     message += `\nTOTAL : ${total.toLocaleString()} FCFA`;
 
     localStorage.setItem('message_commande', message);
+    lockMessageField(message); // Pré-remplit ET verrouille le champ dès l'ouverture du formulaire
     document.getElementById('cartModal').classList.add('hidden');
     document.getElementById('checkoutModal').classList.remove('hidden');
+}
+
+function closeCheckoutModal() {
+    document.getElementById('checkoutModal').classList.add('hidden');
+    localStorage.removeItem('message_commande');
+    unlockMessageField(); // Commande annulée : le champ redevient libre
 }
 
 document.getElementById('finalOrderForm').addEventListener('submit', async function(e) {
@@ -204,14 +238,20 @@ document.getElementById('finalOrderForm').addEventListener('submit', async funct
             const orderIdInput = document.getElementById('order_id');
             if (orderIdInput) orderIdInput.value = result.order_id;
             
-            // 3. Remplissage et préparation de la zone de contact
-            const textareaContact = document.getElementById('message-commande');
-            if (textareaContact) textareaContact.value = message;
-            
-            // 4. Vidage des formulaires de contact
+            // 3. On vide uniquement Nom/Téléphone du formulaire de contact
+            //    (le champ message reste verrouillé avec le récapitulatif de commande)
             const contactForm = document.getElementById('contactForm');
-            if (contactForm) contactForm.reset();
-            
+            if (contactForm) {
+                const nomField = contactForm.querySelector('input[name="nom"]');
+                const telField = contactForm.querySelector('input[name="tel"]');
+                if (nomField) nomField.value = '';
+                if (telField) telField.value = '';
+            }
+
+            // 4. Remplissage + verrouillage de la zone "Détails de la commande"
+            lockMessageField(message);
+            localStorage.removeItem('message_commande');
+
             const responseDiv = document.getElementById('contact-response');
             if (responseDiv) {
                 responseDiv.innerHTML = ""; 
@@ -239,10 +279,9 @@ function decrementQuantity(id) {
 window.addEventListener('hashchange', () => {
     if (window.location.hash === '#contact') {
         const msg = localStorage.getItem('message_commande');
-        const textarea = document.getElementById('message-commande');
-        
-        if (msg && textarea) {
-            textarea.value = msg;
+
+        if (msg) {
+            lockMessageField(msg);
             localStorage.removeItem('message_commande'); // On vide ici aussi
         }
     }
@@ -250,10 +289,9 @@ window.addEventListener('hashchange', () => {
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Gestion du message de commande
     const msg = localStorage.getItem('message_commande');
-    const textarea = document.getElementById('message-commande');
-    
-    if (msg && textarea) {
-        textarea.value = msg;
+
+    if (msg) {
+        lockMessageField(msg);
         // On supprime la clé après l'avoir utilisée pour éviter le remplissage au rechargement
         localStorage.removeItem('message_commande'); 
     }
@@ -311,6 +349,19 @@ function setRating(note) {
             star.style.color = index < note ? '#F8D64E' : '#D1D5DB';
         }
     });
+}
+
+// Fermeture manuelle du modal avis (clic sur la croix) : on ne le réaffichera plus durant cette session
+function closeRatingModal() {
+    const modal = document.getElementById('ratingModal');
+    if (modal) {
+        modal.classList.add('fade-out');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('fade-out');
+        }, 500);
+    }
+    sessionStorage.setItem('avisDejaDemande', 'true');
 }
 // 1. Fonction pour ouvrir la modale
 function openRecrutementModal() {
@@ -376,6 +427,7 @@ async function envoyerAvisFinal() {
         
         if(result.success) {
             alert("Merci pour votre retour !");
+            sessionStorage.setItem('avisDejaDemande', 'true');
             
             // --- NOUVEAU : Animation de fermeture ---
             const modal = document.getElementById('ratingModal');

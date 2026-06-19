@@ -651,7 +651,7 @@ $photos = $queryGallery->fetchAll();
 
 <div id="checkoutModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/80 p-4">
     <div class="bg-white max-w-lg w-full p-8 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh] relative">
-        <button type="button" onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-800 text-3xl font-bold">&times;</button>
+        <button type="button" onclick="closeCheckoutModal()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-800 text-3xl font-bold">&times;</button>
 
         <h2 class="text-2xl font-black mb-6">Finaliser la commande</h2>
         <form id="finalOrderForm" action="traitement_commande.php" method="POST" enctype="multipart/form-data">
@@ -700,7 +700,7 @@ $photos = $queryGallery->fetchAll();
 
             <button type="submit" class="w-full py-4 bg-galaGreen text-white rounded-xl font-black uppercase hover:bg-green-700 transition">Finaliser la commande</button>
             
-            <button type="button" onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="w-full py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Annuler</button>
+            <button type="button" onclick="closeCheckoutModal()" class="w-full py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition">Annuler</button>
         </form>
     </div>
 </div>
@@ -800,6 +800,11 @@ $photos = $queryGallery->fetchAll();
                             <div class="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-[#007A3D] shrink-0"><i class="fas fa-envelope text-xl"></i></div>
                             <div><p class="font-black text-lg">Email Professionnel</p><p class="text-slate-500">info@adisa-cm.com</p></div>
                         </div>
+                        
+<button onclick="openRecrutementModal()" 
+        class="inline-block px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
+    <i class="fas fa-paper-plane mr-2"></i> Recrutement
+</button>
                     </div>
                 </div>
         <div class="bg-white p-10 md:p-14 rounded-[3rem] shadow-xl border border-slate-300">
@@ -813,13 +818,16 @@ $photos = $queryGallery->fetchAll();
                         <input type="text" name="nom" required class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition">
                     </div>
                     <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-2">Téléphone *</label>
-                        <input type="tel" name="tel" required class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Ex: 6xx xx xx xx">
-                    </div>
+    <label class="block text-sm font-bold text-slate-700 mb-2">Téléphone *</label>
+    <input type="text" name="tel" required pattern="\d{9}" maxlength="9"  oninput="this.value = this.value.replace(/[^0-9]/g, '')"class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Ex: 6xxxxxxxx" >
+</div>
                 </div>
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">Votre Message / Détails de la commande</label>
-                    <textarea name="message" id="message-commande" rows="5" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Décrivez votre commande ou posez votre question..."></textarea>
+                    <textarea name="message" id="message-commande" rows="5" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-galaGreen outline-none transition" placeholder="Laissez votre avis..."></textarea>
+                    <p id="message-commande-lock-hint" class="hidden mt-2 text-xs font-semibold text-galaGreen flex items-center gap-1.5">
+                        <i class="fas fa-lock"></i> Ce champ a été rempli automatiquement avec les détails de votre commande et ne peut pas être modifié.
+                    </p>
                 </div>
                 <button type="submit" class="w-full py-4 bg-[#007A3D] text-white rounded-2xl font-bold shadow-lg hover:bg-[#005c2e] transition uppercase tracking-wider text-sm">
                     Envoyer le message
@@ -829,10 +837,6 @@ $photos = $queryGallery->fetchAll();
     </div>
 </section>
 
-<button onclick="openRecrutementModal()" 
-        class="inline-block px-10 py-5 bg-galaGold text-galaDark rounded-2xl font-black shadow-2xl hover:scale-105 transition-transform uppercase text-sm tracking-[0.1em]">
-    <i class="fas fa-paper-plane mr-2"></i> Soumettre mon dossier
-</button>
 
 <div id="recrutementModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm hidden p-4">
     <div class="bg-white w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl relative">
@@ -937,7 +941,8 @@ $photos = $queryGallery->fetchAll();
 
 
     <div id="ratingModal" class="fixed inset-0 z-[9999] hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-6 text-center animate-in fade-in zoom-in duration-300 relative">
+        <button type="button" onclick="closeRatingModal()" aria-label="Fermer" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 text-2xl font-bold leading-none">&times;</button>
         <div class="text-4xl mb-4">💬</div>
         <h3 class="text-lg font-bold text-gray-800 mb-2">Comment avez-vous trouvé notre service ?</h3>
         <p class="text-sm text-gray-500 mb-6">Votre avis nous aide à nous améliorer.</p>

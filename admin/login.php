@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['admin_logged'] = true;
-        header('Location: messages.php');
+        header('Location: dashboard.php');
         exit;
     } else {
         $erreur = "Identifiants d'accès invalides.";

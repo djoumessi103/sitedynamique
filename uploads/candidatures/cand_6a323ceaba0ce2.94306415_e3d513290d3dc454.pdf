@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV — Djoumessi Magne Horlane-Jesica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ════════════════════════════════════════════
+   RESET
+════════════════════════════════════════════ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --navy : #0b1f3a;
+  --cyan : #0ea5e9;
+  --teal : #0d9488;
+  --cyan2: #38bdf8;
+  --muted: #64748b;
+  --text : #1e293b;
+  --bdr  : #e2e8f0;
+  --sw   : 193px;   /* largeur sidebar */
+}
+
+/* ════════════════════════════════════════════
+   BARRE D'ACTIONS  (jamais imprimée)
+════════════════════════════════════════════ */
+.print-bar {
+  background: var(--navy); color:#fff;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 22px; gap:12px;
+  position:sticky; top:0; z-index:100;
+  font-family:'JetBrains Mono',monospace;
+}
+.print-bar p { font-size:.7rem; opacity:.65; }
+.print-bar-btns { display:flex; gap:8px; }
+.btn-print {
+  background:var(--cyan); color:var(--navy);
+  font-size:.75rem; font-weight:700;
+  padding:6px 16px; border-radius:5px; border:none; cursor:pointer;
+  display:inline-flex; align-items:center; gap:5px;
+}
+.btn-back {
+  background:transparent; color:#fff;
+  font-size:.75rem; font-weight:500;
+  padding:6px 14px; border-radius:5px;
+  border:1px solid rgba(255,255,255,.25);
+  cursor:pointer; text-decoration:none;
+  display:inline-flex; align-items:center; gap:5px;
+}
+
+/* ════════════════════════════════════════════
+   WRAPPER ÉCRAN  →  centre la page A4
+════════════════════════════════════════════ */
+body {
+  font-family:'Inter',sans-serif;
+  background:#e8edf3;
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+
+/* ════════════════════════════════════════════
+   PAGE A4  —  dimensions FIXES en pixels
+   794 × 1123 px  =  210 mm × 297 mm @96dpi
+════════════════════════════════════════════ */
+.page {
+  width : 794px;
+  height: 1123px;
+  margin: 28px auto;
+  background:#fff;
+  box-shadow: 0 6px 48px rgba(0,0,0,.22);
+  display:grid;
+  grid-template-columns: var(--sw) 1fr;
+  grid-template-rows: auto 1fr;
+  overflow:hidden;          /* coupe tout débordement */
+  font-size:7.8pt;
+  line-height:1.42;
+  color:var(--text);
+}
+
+/* ════════════════════════════════════════════
+   EN-TÊTE (pleine largeur)
+════════════════════════════════════════════ */
+.cv-header {
+  grid-column:1/-1;
+  background:var(--navy);
+  padding:15px 24px 13px;
+  display:flex; align-items:center; gap:16px;
+}
+.avatar {
+  width:56px; height:56px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg,var(--cyan),var(--teal));
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.3rem; font-weight:700; color:#fff; letter-spacing:-1px;
+}
+.hd-text { flex:1; }
+.hd-text h1 {
+  font-size:1.18rem; font-weight:700; color:#fff;
+  letter-spacing:-.02em; line-height:1.15; margin-bottom:2px;
+}
+.hd-sub { font-size:.75rem; color:var(--cyan2); font-weight:500; margin-bottom:6px; }
+.badges { display:flex; flex-wrap:wrap; gap:4px; }
+.badge {
+  font-family:'JetBrains Mono',monospace; font-size:.57rem;
+  padding:2px 7px; border-radius:3px;
+  background:rgba(14,165,233,.13); border:1px solid rgba(14,165,233,.3); color:var(--cyan2);
+  display:inline-flex; align-items:center;
+}
+.badge.g { background:rgba(13,148,136,.13); border-color:rgba(13,148,136,.3); color:#5eead4; }
+
+.contacts { display:flex; flex-direction:column; gap:4px; align-items:flex-end; }
+.ci { display:flex; align-items:center; gap:5px; font-size:.65rem; color:rgba(255,255,255,.72); }
+.ci svg { width:10px; height:10px; fill:var(--cyan); flex-shrink:0; }
+
+/* ════════════════════════════════════════════
+   SIDEBAR
+════════════════════════════════════════════ */
+.sidebar {
+  background:#f8fafc;
+  border-right:1px solid var(--bdr);
+  padding:13px 12px;
+  display:flex; flex-direction:column; gap:12px;
+  overflow:hidden;
+}
+.sb-h {
+  font-family:'JetBrains Mono',monospace;
+  font-size:.54rem; font-weight:600; color:var(--cyan);
+  text-transform:uppercase; letter-spacing:.1em;
+  border-bottom:1.5px solid var(--cyan);
+  padding-bottom:3px; margin-bottom:6px; display:block;
+}
+/* skill bars */
+.sk { margin-bottom:5px; }
+.sk-lbl { display:flex; justify-content:space-between; margin-bottom:2px; }
+.sk-n { font-size:.67rem; font-weight:500; }
+.sk-p { font-size:.56rem; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+.sk-bar { height:4px; background:var(--bdr); border-radius:2px; overflow:hidden; }
+.sk-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,var(--cyan),var(--teal)); }
+/* outils */
+.tags { display:flex; flex-wrap:wrap; gap:3px; }
+.tag {
+  font-size:.57rem; font-family:'JetBrains Mono',monospace;
+  background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;
+  padding:1px 5px; border-radius:2px;
+}
+/* certifs */
+.cert {
+  background:linear-gradient(135deg,#0ea5e914,#0d948814);
+  border:1px solid #bae6fd; border-radius:4px;
+  padding:6px 8px; margin-bottom:4px;
+}
+.cert-n { font-size:.67rem; font-weight:600; color:var(--navy); margin-bottom:1px; }
+.cert-o { font-size:.58rem; color:var(--muted); }
+.cert-y { font-family:'JetBrains Mono',monospace; font-size:.55rem; color:var(--cyan); }
+/* langues */
+.lng { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.lng-n { font-size:.67rem; font-weight:500; }
+.lng-l {
+  font-size:.55rem; color:#fff; background:var(--navy);
+  padding:1px 6px; border-radius:2px; font-family:'JetBrains Mono',monospace;
+}
+.lng-l.b { background:var(--cyan); color:var(--navy); }
+/* soft */
+.soft { font-size:.65rem; margin-bottom:4px; padding-left:10px; position:relative; }
+.soft::before { content:'▸'; position:absolute; left:0; color:var(--cyan); font-size:.6rem; }
+
+/* ════════════════════════════════════════════
+   MAIN
+════════════════════════════════════════════ */
+.main {
+  padding:13px 17px;
+  display:flex; flex-direction:column; gap:10px;
+  overflow:hidden;
+}
+.sec-h {
+  font-size:.62rem; font-weight:700; color:var(--navy);
+  text-transform:uppercase; letter-spacing:.1em;
+  padding-bottom:4px; margin-bottom:7px;
+  border-bottom:1.5px solid var(--navy);
+  display:flex; align-items:center; gap:6px;
+}
+.sec-h::after {
+  content:''; flex:1; height:1.5px;
+  background:linear-gradient(90deg,var(--cyan),transparent);
+}
+/* profil */
+.profil {
+  font-size:.7rem; color:var(--muted); line-height:1.55;
+  border-left:2.5px solid var(--cyan); padding-left:9px;
+}
+/* timeline */
+.tl { display:flex; flex-direction:column; gap:7px; }
+.tli { display:grid; grid-template-columns:8px 1fr; gap:0 8px; }
+.dot-col { display:flex; flex-direction:column; align-items:center; padding-top:3px; }
+.dot {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--cyan); flex-shrink:0;
+  border:1.5px solid #fff; box-shadow:0 0 0 1.5px var(--cyan);
+}
+.line { flex:1; width:1.5px; background:var(--bdr); margin-top:2px; }
+.tl-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1px; }
+.tl-t { font-size:.7rem; font-weight:600; line-height:1.3; }
+.tl-d { font-family:'JetBrains Mono',monospace; font-size:.56rem; color:var(--cyan); white-space:nowrap; margin-left:5px; }
+.tl-o { font-size:.62rem; color:var(--muted); margin-bottom:2px; }
+.tl-ul { list-style:none; }
+.tl-ul li {
+  font-size:.64rem; color:var(--muted); line-height:1.4;
+  padding-left:9px; position:relative; margin-bottom:1px;
+}
+.tl-ul li::before { content:'▸'; position:absolute; left:0; color:var(--cyan); font-size:.58rem; }
+.tl-tags { display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+.tl-tag {
+  font-family:'JetBrains Mono',monospace; font-size:.56rem;
+  color:#0369a1; background:#e0f2fe; border:1px solid #bae6fd;
+  padding:1px 5px; border-radius:2px;
+}
+
+/* ════════════════════════════════════════════
+   IMPRESSION  —  la seule règle qui compte
+   On imprime exactement le rendu écran,
+   mis à l'échelle pour tenir sur A4.
+════════════════════════════════════════════ */
+@media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Masquer tout sauf la page CV */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    width: 210mm !important;
+    height: 297mm !important;
+  }
+
+  .print-bar { display:none !important; }
+
+  /*
+    La page fait 794px × 1123px.
+    A4 en mm = 210mm × 297mm.
+    On demande au navigateur de la comprimer
+    exactement pour remplir la feuille.
+  */
+  .page {
+    margin: 0 !important;
+    box-shadow: none !important;
+    /* Convertit la page pixel en page mm exacte */
+    width: 210mm !important;
+    height: 297mm !important;
+    /* Rétrécit les pixels pour coller au mm */
+    zoom: calc(210mm / 794px);
+    /* Fallback Firefox */
+    -moz-transform: scale(calc(210 / 794 * (25.4 / 25.4)));
+    -moz-transform-origin: top left;
+    overflow: hidden !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* ── responsive mobile (écran) ── */
+@media screen and (max-width: 860px) {
+  .page { width:100%; height:auto; grid-template-columns:1fr; }
+  .cv-header { flex-direction:column; }
+  .contacts { align-items:flex-start; }
+  .sidebar { border-right:none; border-bottom:1px solid var(--bdr); }
+}
+</style>
+</head>
+<body>
+
+<!-- BARRE -->
+<div class="print-bar">
+  <p>// Imprimer → "Enregistrer en PDF" → Marges : <strong>Aucune</strong> → Décocher en-têtes/pieds de page</p>
+  <div class="print-bar-btns">
+    <a href="index_v2.html" class="btn-back">← Portfolio</a>
+    <button class="btn-print" onclick="window.print()">⬇ Imprimer / PDF</button>
+  </div>
+</div>
+
+<!-- ══ PAGE A4 ══ -->
+<div class="page">
+
+  <!-- EN-TÊTE -->
+  <header class="cv-header">
+    <div class="avatar">HJ</div>
+    <div class="hd-text">
+      <h1>Djoumessi Magne Horlane-Jesica</h1>
+      <p class="hd-sub">Ingénieure Conceptrice &amp; Développeuse d'Applications</p>
+      <div class="badges">
+        <span class="badge g">✦ Master 1 Génie Logiciel</span>
+        <span class="badge">⬡ Scrum Fundamentals Certified — SFC™</span>
+        <span class="badge">⬢ Oracle Database SQL Certified Associate</span>
+        <span class="badge">✦ Full-Stack · Web · Mobile</span>
+      </div>
+    </div>
+    <div class="contacts">
+      <div class="ci">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        djoujesica86@gmail.com
+      </div>
+      <div class="ci">
+        <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        +237 656 876 238
+      </div>
+      <div class="ci">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Cameroun
+      </div>
+      <div class="ci">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        https://github.com/djoumessi103
+      </div>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div>
+      <span class="sb-h">Compétences</span>
+      <div class="sk"><div class="sk-lbl"><span class="sk-n">Laravel / PHP</span><span class="sk-p">92%</span></div><div class="sk-bar"><div class="sk-fill" style="width:92%"></div></div></div>
+      <div class="sk"><div class="sk-lbl"><span class="sk-n">Flutter / Dart</span><span class="sk-p">85%</span></div><div class="sk-bar"><div class="sk-fill" style="width:85%"></div></div></div>
+      <div class="sk"><div class="sk-lbl"><span class="sk-n">Angular</span><span class="sk-p">80%</span></div><div class="sk-bar"><div class="sk-fill" style="width:80%"></div></div></div>
+      <div class="sk"><div class="sk-lbl"><span class="sk-n">Java</span><span class="sk-p">75%</span></div><div class="sk-bar"><div class="sk-fill" style="width:75%"></div></div></div>
+      <div class="sk"><div class="sk-lbl"><span class="sk-n">MySQL</span><span class="sk-p">88%</span></div><div class="sk-bar"><div class="sk-fill" style="width:88%"></div></div></div>
+      <div class="sk" style="margin-bottom:0"><div class="sk-lbl"><span class="sk-n">JS / HTML / CSS</span><span class="sk-p">90%</span></div><div class="sk-bar"><div class="sk-fill" style="width:90%"></div></div></div>
+    </div>
+
+    <div>
+      <span class="sb-h">Outils &amp; Méthodes</span>
+      <div class="tags">
+        <span class="tag">Git / GitHub</span><span class="tag">REST API</span>
+        <span class="tag">MVC</span><span class="tag">Scrum</span>
+        <span class="tag">Bootstrap</span><span class="tag">VS Code</span>
+        <span class="tag">UML</span><span class="tag">Merise</span>
+      </div>
+    </div>
+
+    <div>
+      <span class="sb-h">Certifications</span>
+      <div class="cert">
+        <p class="cert-n">Scrum Fundamentals Certified</p>
+        <p class="cert-o">SCRUMstudy™ — SFC™</p>
+        <p class="cert-y">2025</p>
+      </div>
+      <div class="cert" style="margin-bottom:0">
+        <p class="cert-n">Oracle DB SQL Certified Associate</p>
+        <p class="cert-o">Certification Professionnelle</p>
+        <p class="cert-y">2026</p>
+      </div>
+    </div>
+
+    <div>
+      <span class="sb-h">Langues</span>
+      <div class="lng"><span class="lng-n">Français</span><span class="lng-l b">Natif</span></div>
+      <div class="lng" style="margin-bottom:0"><span class="lng-n">Anglais</span><span class="lng-l">Professionnel</span></div>
+    </div>
+
+    <div>
+      <span class="sb-h">Aptitudes</span>
+      <div class="soft">Autonomie &amp; rigueur</div>
+      <div class="soft">Travail en équipe Agile</div>
+      <div class="soft">Résolution de problèmes</div>
+      <div class="soft">Communication technique</div>
+      <div class="soft" style="margin-bottom:0">Veille technologique</div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <section>
+      <h2 class="sec-h">Profil Professionnel</h2>
+      <p class="profil">
+        Ingénieure logicielle passionnée, en Master 1 Systeme d'Information, spécialisée dans la conception d'architectures web scalables (Laravel, Angular), d'APIs REST sécurisées et d'applications mobiles cross-platform (Flutter). Certifiée Scrum Fundamentals &amp; Oracle SQL, je combine rigueur technique et méthodologie Agile pour livrer des solutions robustes et orientées performance.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="sec-h">Formation</h2>
+      <div class="tl">
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div><div class="line"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">Master 1 Professionnel — Systèmes d'Information</span><span class="tl-d">2026</span></div>
+            <p class="tl-o">Institut Supérieur Sa'a Djamen · Cameroun</p>
+            <ul class="tl-ul">
+              <li>Architecture logicielle avancée, systèmes distribués, qualité &amp; tests</li>
+              <li>Gestion de projets Agile/Scrum — APIs REST, microservices, intégration mobile/web</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div><div class="line"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">Licence Professionnelle — Informatique / Génie Logiciel</span><span class="tl-d">2025</span></div>
+            <p class="tl-o">Institut Supérieur Sa'a Djamen · Cameroun</p>
+            <ul class="tl-ul">
+              <li>POO (Java, PHP), bases de données, modélisation UML &amp; Merise, développement web full-stack</li>
+            </ul>
+          </div>
+        </div>
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">BTS — Génie Logiciel</span><span class="tl-d">2024</span></div>
+            <p class="tl-o">Institut Supérieur des Sciences de l'Industrie · Cameroun</p>
+            <ul class="tl-ul">
+              <li>Développement d'applications, algorithmique, bases de données et réseaux</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="sec-h">Stages &amp; Expérience</h2>
+      <div class="tl">
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div><div class="line"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">Stage — Institut Supérieur Sa'a Djamen</span><span class="tl-d">Mars – Août 2025</span></div>
+            <p class="tl-o">Institut Supérieur Sa'a Djamen · Cameroun</p>
+            <ul class="tl-ul">
+              <li>Conception d'une application de gestion hospitaliere avec Angular + Flutter, APIs Laravel/Java sécurisées</li>
+              <li>Implémentation JWT, gestion des droits d'accès et synchronisation temps réel</li>
+            </ul>
+            <div class="tl-tags">
+              <span class="tl-tag">Angular</span><span class="tl-tag">Flutter</span><span class="tl-tag">Laravel</span><span class="tl-tag">Java</span><span class="tl-tag">JWT</span>
+            </div>
+          </div>
+        </div>
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div><div class="line"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">Stage — Hi-Tech Vision</span><span class="tl-d">Juin – Août 2024</span></div>
+            <p class="tl-o">Hi-Tech Vision · Cameroun</p>
+            <ul class="tl-ul">
+              <li>Application mobile de pointage RH (mobile &amp; Android)</li>
+              <li>Consommation d'APIs REST asynchrones et génération de rapports statistiques</li>
+            </ul>
+            <div class="tl-tags">
+              <span class="tl-tag">Flutter</span><span class="tl-tag">Dart</span><span class="tl-tag">Laravel API</span><span class="tl-tag">MySQL</span>
+            </div>
+          </div>
+        </div>
+        <div class="tli">
+          <div class="dot-col"><div class="dot"></div></div>
+          <div>
+            <div class="tl-head"><span class="tl-t">Développeuse Full-Stack — Plateforme E-Commerce</span><span class="tl-d">2024 – 2025</span></div>
+            <ul class="tl-ul">
+              <li>App MVC de gestion commerciale — stocks temps réel, factures et reçus PDF automatiques</li>
+            </ul>
+            <div class="tl-tags">
+              <span class="tl-tag">PHP</span><span class="tl-tag">MVC</span><span class="tl-tag">Tailwind CSS</span><span class="tl-tag">JavaScript</span><span class="tl-tag">MySQL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Code injected by live-server -->
+<script>
+	// <![CDATA[  <-- For SVG support
+	if ('WebSocket' in window) {
+		(function () {
+			function refreshCSS() {
+				var sheets = [].slice.call(document.getElementsByTagName("link"));
+				var head = document.getElementsByTagName("head")[0];
+				for (var i = 0; i < sheets.length; ++i) {
+					var elem = sheets[i];
+					var parent = elem.parentElement || head;
+					parent.removeChild(elem);
+					var rel = elem.rel;
+					if (elem.href && typeof rel != "string" || rel.length == 0 || rel.toLowerCase() == "stylesheet") {
+						var url = elem.href.replace(/(&|\?)_cacheOverride=\d+/, '');
+						elem.href = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cacheOverride=' + (new Date().valueOf());
+					}
+					parent.appendChild(elem);
+				}
+			}
+			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
+			var address = protocol + window.location.host + window.location.pathname + '/ws';
+			var socket = new WebSocket(address);
+			socket.onmessage = function (msg) {
+				if (msg.data == 'reload') window.location.reload();
+				else if (msg.data == 'refreshcss') refreshCSS();
+			};
+			if (sessionStorage && !sessionStorage.getItem('IsThisFirstTime_Log_From_LiveServer')) {
+				console.log('Live reload enabled.');
+				sessionStorage.setItem('IsThisFirstTime_Log_From_LiveServer', true);
+			}
+		})();
+	}
+	else {
+		console.error('Upgrade your browser. This Browser is NOT supported WebSocket for Live-Reloading.');
+	}
+	// ]]>
+</script>
+</body>
+</html>
