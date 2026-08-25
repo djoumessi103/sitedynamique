@@ -315,6 +315,37 @@ ALTER TABLE `users`
 --
 -- AUTO_INCREMENT pour les tables déchargées
 --
+-- ═══════════════════════════════════════════════════════
+-- AJOUT DU SYSTÈME DE RÔLES — Gala Agro Admin
+-- À exécuter une seule fois dans phpMyAdmin / votre client SQL
+-- ═══════════════════════════════════════════════════════
+
+-- 1. Ajoute la colonne 'role' à la table users
+ALTER TABLE users
+ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'commercial' AFTER password;
+
+-- 2. (Recommandé) Restreint les valeurs possibles aux 3 rôles métier
+ALTER TABLE users
+MODIFY COLUMN role ENUM('admin','rh','commercial') NOT NULL DEFAULT 'commercial';
+
+-- 3. Passez votre compte existant en 'admin'
+--    ⚠️ Remplacez 'votre_identifiant' par votre vrai nom d'utilisateur actuel
+UPDATE users SET role = 'admin' WHERE username = 'votre_identifiant';
+
+-- 4. Créez les nouveaux comptes RH et Commercial
+--    ⚠️ Remplacez les deux '$2y$10$...' par un hash généré avec
+--       generate_password_hash.php (fourni à part), PUIS supprimez ce fichier.
+INSERT INTO users (username, password, role) VALUES
+('rh_gala',         '$2y$10$REMPLACER_PAR_VOTRE_HASH', 'rh'),
+('commercial_gala', '$2y$10$REMPLACER_PAR_VOTRE_HASH', 'commercial');
+
+-- ═══════════════════════════════════════════════════════
+-- RAPPEL DES RÔLES ET DE LEURS ACCÈS
+-- ═══════════════════════════════════════════════════════
+-- admin      → Tableau de bord, Commandes, Produits, Messages, Candidatures, Galerie (TOUT)
+-- rh         → Tableau de bord, Candidatures
+-- commercial → Tableau de bord, Commandes, Produits, Messages
+-- ═══════════════════════════════════════════════════════
 
 --
 -- AUTO_INCREMENT pour la table `avis_clients`

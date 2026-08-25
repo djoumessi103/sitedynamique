@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['admin_logged'] = true;
+        $_SESSION['username']     = $user['username'];
+        $_SESSION['role']         = $user['role'] ?? 'commercial';
         header('Location: dashboard.php');
         exit;
     } else {
@@ -32,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-galaGold: '#f8f9f8f1', h-screen flex items-center justify-center p-4">
+<body class="bg-galaGold h-screen flex items-center justify-center p-4">
     <div class="bg-white p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl w-full max-w-md">
         <div class="text-center mb-8">
             <h2 class="text-2xl md:text-3xl font-black text-slate-800">Gala Admin Panel</h2>

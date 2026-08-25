@@ -1,6 +1,29 @@
 <?php
+session_start();
+$allowed_roles = ['admin', 'rh'];
+require_once '../includes/auth_check.php';
 require_once '../includes/db.php';
 $current_page = 'voir_candidatures.php';
+
+// ── Journalisation des modifications de statut / suppressions (appelée par le JS) ──
+if (isset($_GET['api']) && $_GET['api'] === 'log_action') {
+    header('Content-Type: application/json');
+    $data    = json_decode(file_get_contents('php://input'), true);
+    $action  = $data['action'] ?? '';
+    $id      = (int)($data['id'] ?? 0);
+    $details = trim($data['details'] ?? '');
+    if ($id && in_array($action, ['modification_statut', 'suppression'], true)) {
+        try {
+            require_once '../includes/log_activity.php';
+            logActivity($pdo, $action, 'candidatures', $id, $details ?: "Candidature #$id");
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'msg' => 'Journal indisponible : ' . $e->getMessage()]);
+            exit;
+        }
+    }
+    echo json_encode(['ok' => true]);
+    exit;
+}
 
 $query = $pdo->query("SELECT * FROM candidatures ORDER BY created_at DESC");
 $candidatures = $query->fetchAll();
@@ -276,7 +299,7 @@ if ($page > $total_pages && $total_pages > 0) {
 <!-- ══ OVERLAY ══ -->
 <div id="admin-overlay"></div>
 
-<!-- ══ MOBILE DRAWER ══ -->
+<!-- ══ MOBILE DRAWER (filtré par rôle) ══ -->
 <div id="admin-mobile-nav" aria-hidden="true">
     <div class="amn-header">
         <div class="flex items-center gap-3">
@@ -290,31 +313,51 @@ if ($page > $total_pages && $total_pages > 0) {
     </div>
     <div class="amn-body">
         <div class="amn-label">Navigation</div>
-        <a href="admin_commandes.php" class="amn-link">
+
+        <!-- Dashboard : tous les rôles -->
+        <a href="dashboard.php" class="amn-link">
+            <span class="amn-icon" style="color:#16a34a"><i class="fas fa-chart-pie"></i></span>
+            <span class="amn-link-text">Tableau de bord<span class="amn-link-sub">Vue d'ensemble</span></span>
+            <i class="fas fa-chevron-right amn-arrow"></i>
+        </a>
+
+        <?php if (in_array($_SESSION['role'] ?? '', ['admin', 'commercial'], true)): ?>
+        <a href="admin_commandes.php" class="amn-link ">
             <span class="amn-icon" style="color:#059669"><i class="fas fa-shopping-cart"></i></span>
             <span class="amn-link-text">Commandes<span class="amn-link-sub">Finaliser les commandes</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
-        <a href="messages.php" class="amn-link">
+        <?php endif; ?>
+
+        <?php if (in_array($_SESSION['role'] ?? '', ['admin', 'commercial'], true)): ?>
+        <a href="messages.php" class="amn-link ">
             <span class="amn-icon" style="color:#3b82f6"><i class="fas fa-envelope"></i></span>
             <span class="amn-link-text">Messages<span class="amn-link-sub">Boîte de réception</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
-        <a href="products_manager.php" class="amn-link">
-            <span class="amn-icon" style="color:#f59e0b"><i class="fas fa-box"></i></span>
-            <span class="amn-link-text">Produits<span class="amn-link-sub">Gérer la gamme</span></span>
-            <i class="fas fa-chevron-right amn-arrow"></i>
-        </a>
-        <a href="gallery.php" class="amn-link">
-            <span class="amn-icon" style="color:#db2777"><i class="fas fa-images"></i></span>
-            <span class="amn-link-text">Galerie<span class="amn-link-sub">Photos & médias</span></span>
-            <i class="fas fa-chevron-right amn-arrow"></i>
-        </a>
+        <?php endif; ?>
+
+        <?php if (in_array($_SESSION['role'] ?? '', ['admin', 'rh'], true)): ?>
         <a href="voir_candidatures.php" class="amn-link active-link">
             <span class="amn-icon" style="color:#8b5cf6"><i class="fas fa-users"></i></span>
             <span class="amn-link-text">Candidatures<span class="amn-link-sub">Voir les dossiers</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
+        <?php endif; ?>
+
+        <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>
+        <a href="products_manager.php" class="amn-link ">
+            <span class="amn-icon" style="color:#f59e0b"><i class="fas fa-box"></i></span>
+            <span class="amn-link-text">Produits<span class="amn-link-sub">Gérer la gamme</span></span>
+            <i class="fas fa-chevron-right amn-arrow"></i>
+        </a>
+        <a href="gallery.php" class="amn-link ">
+            <span class="amn-icon" style="color:#db2777"><i class="fas fa-images"></i></span>
+            <span class="amn-link-text">Galerie<span class="amn-link-sub">Photos &amp; médias</span></span>
+            <i class="fas fa-chevron-right amn-arrow"></i>
+        </a>
+        <?php endif; ?>
+
         <a href="../index.php" class="amn-link">
             <span class="amn-icon" style="color:#E30613"><i class="fas fa-globe"></i></span>
             <span class="amn-link-text">Consulter le site<span class="amn-link-sub">Voir la vitrine</span></span>
@@ -328,7 +371,6 @@ if ($page > $total_pages && $total_pages > 0) {
         </a>
     </div>
 </div>
-
 <!-- ══ MAIN ══ -->
 <main class="flex-1 p-4 md:p-8">
     <div class="max-w-6xl mx-auto">
@@ -415,7 +457,8 @@ if ($page > $total_pages && $total_pages > 0) {
             </td>
 
             <td class="p-4 md:p-5 text-center" data-label="Statut">
-                <select onchange="updateStatut(<?= $c['id'] ?>, this.value)"
+                <select onchange="updateStatut(<?= $c['id'] ?>, this.value, this)"
+                        data-old="<?= htmlspecialchars($c['statut']) ?>"
                         class="text-[10px] font-black uppercase px-3 py-1 rounded-full cursor-pointer outline-none transition <?= $statutClass ?>">
                     <option value="En attente" <?= $c['statut']=='En attente'?'selected':'' ?>>En attente</option>
                     <option value="Validé"     <?= $c['statut']=='Validé'   ?'selected':'' ?>>Validé</option>
@@ -615,14 +658,34 @@ doc.text('Édité le ' + dateEdition + ' · Confidentiel', pageWidth - 10, 18, {
 })();
 
 // ══ STATUT ══
-function updateStatut(id, nouveauStatut) {
+function updateStatut(id, nouveauStatut, selectEl) {
+    const ancienStatut = selectEl ? selectEl.dataset.old : '';
     fetch('update_candidature_status.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: `id=${id}&statut=${nouveauStatut}`
     })
     .then(r => r.json())
-    .then(data => { if(data.success) location.reload(); else alert("Erreur lors de la mise à jour."); });
+    .then(data => {
+        if (data.success) {
+            // Journal d'activité — on enregistre qui a changé quel statut
+            fetch('voir_candidatures.php?api=log_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'modification_statut',
+                    id: id,
+                    details: `Statut changé : '${ancienStatut}' → '${nouveauStatut}'`
+                })
+            })
+            .then(r => r.json())
+            .then(j => { if (j.ok === false) console.warn('Journal d\'activité :', j.msg); })
+            .catch(() => console.warn('Journal d\'activité : requête réseau échouée'))
+            .finally(() => location.reload());
+        } else {
+            alert("Erreur lors de la mise à jour.");
+        }
+    });
 }
 
 // ══ SUPPRESSION ══
@@ -643,6 +706,16 @@ function supprimerCandidature(id) {
             .then(r => r.json())
             .then(data => {
                 if(data.success) {
+                    // Journal d'activité — on enregistre qui a supprimé quoi
+                    fetch('voir_candidatures.php?api=log_action', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'suppression', id: id, details: `Candidature #${id} supprimée` })
+                    })
+                    .then(r => r.json())
+                    .then(j => { if (j.ok === false) console.warn('Journal d\'activité :', j.msg); })
+                    .catch(() => console.warn('Journal d\'activité : requête réseau échouée'));
+
                     const row = document.querySelector(`tr[data-id='${id}']`);
                     row.style.opacity = '0';
                     setTimeout(() => row.remove(), 500);

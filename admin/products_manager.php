@@ -1,6 +1,7 @@
 <?php
 session_start();
-if (!isset($_SESSION['admin_logged'])) { header('Location: login.php'); exit; }
+$allowed_roles = ['admin', 'commercial'];   // ou ['admin', 'rh'] pour voir_candidatures.php, ou ['admin'] pour gallery.php
+require_once '../includes/auth_check.php';
 require_once '../includes/db.php';
 // --- AJOUT POUR BACKOFFICE LIVE UPDATE ---
 if (isset($_GET['api_admin_stock'])) {
@@ -289,30 +290,42 @@ if (isset($_POST['ajax_decrement_id'])) {
 <!-- ══ OVERLAY ══ -->
 <div id="admin-overlay"></div>
 
-<!-- ══ MOBILE DRAWER ══ -->
+<!-- ══ MOBILE DRAWER (filtré par rôle) ══ -->
 <div id="admin-mobile-nav" aria-hidden="true">
     <div class="amn-header">
         <div class="flex items-center gap-3">
             <div class="amn-logo">G</div>
-            <div>
-                <div class="amn-title">Gala Admin</div>
-                <div class="amn-sub">Dashboard 2026</div>
-            </div>
+            <div><div class="amn-title">Gala Admin</div><div class="amn-sub">Dashboard 2026</div></div>
         </div>
         <button class="amn-close" id="admin-nav-close"><i class="fas fa-times"></i></button>
     </div>
     <div class="amn-body">
         <div class="amn-label">Navigation</div>
+        <a href="dashboard.php" class="amn-link">
+            <span class="amn-icon" style="color:#16a34a"><i class="fas fa-chart-pie"></i></span>
+            <span class="amn-link-text">Tableau de bord<span class="amn-link-sub">Vue d'ensemble</span></span>
+            <i class="fas fa-chevron-right amn-arrow"></i>
+        </a>
+        <?php if (in_array($_SESSION['role'] ?? '', ['admin', 'commercial'], true)): ?>
         <a href="admin_commandes.php" class="amn-link">
             <span class="amn-icon" style="color:#059669"><i class="fas fa-shopping-cart"></i></span>
             <span class="amn-link-text">Commandes<span class="amn-link-sub">Finaliser les commandes</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
-         <a href="voir_candidatures.php" class="amn-link">
+        <a href="messages.php" class="amn-link">
             <span class="amn-icon" style="color:#3b82f6"><i class="fas fa-envelope"></i></span>
             <span class="amn-link-text">Messages<span class="amn-link-sub">Boîte de réception</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
+        <?php endif; ?>
+        <?php if (in_array($_SESSION['role'] ?? '', ['admin', 'rh'], true)): ?>
+        <a href="voir_candidatures.php" class="amn-link">
+            <span class="amn-icon" style="color:#8b5cf6"><i class="fas fa-users"></i></span>
+            <span class="amn-link-text">Candidatures<span class="amn-link-sub">Voir les dossiers</span></span>
+            <i class="fas fa-chevron-right amn-arrow"></i>
+        </a>
+        <?php endif; ?>
+        <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>
         <a href="products_manager.php" class="amn-link active-link">
             <span class="amn-icon" style="color:#f59e0b"><i class="fas fa-box"></i></span>
             <span class="amn-link-text">Produits<span class="amn-link-sub">Gérer la gamme</span></span>
@@ -320,14 +333,10 @@ if (isset($_POST['ajax_decrement_id'])) {
         </a>
         <a href="gallery.php" class="amn-link">
             <span class="amn-icon" style="color:#db2777"><i class="fas fa-images"></i></span>
-            <span class="amn-link-text">Galerie<span class="amn-link-sub">Photos & médias</span></span>
+            <span class="amn-link-text">Galerie<span class="amn-link-sub">Photos &amp; médias</span></span>
             <i class="fas fa-chevron-right amn-arrow"></i>
         </a>
-        <a href="voir_candidatures.php" class="amn-link">
-            <span class="amn-icon" style="color:#8b5cf6"><i class="fas fa-users"></i></span>
-            <span class="amn-link-text">Candidatures<span class="amn-link-sub">Voir les dossiers</span></span>
-            <i class="fas fa-chevron-right amn-arrow"></i>
-        </a>
+        <?php endif; ?>
         <a href="../index.php" class="amn-link">
             <span class="amn-icon" style="color:#E30613"><i class="fas fa-globe"></i></span>
             <span class="amn-link-text">Consulter le site<span class="amn-link-sub">Voir la vitrine</span></span>

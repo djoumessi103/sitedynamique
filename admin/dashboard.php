@@ -1,117 +1,237 @@
 <?php
 session_start();
-if (!isset($_SESSION['admin_logged']) || $_SESSION['admin_logged'] !== true) {
-    header('Location: login.php');
-    exit;
-}
+
+$allowed_roles = ['admin', 'rh', 'commercial']; // le tableau de bord reste accessible à tous les rôles connectés
+require_once '../includes/auth_check.php';
 require_once '../includes/db.php';
 
-// ═══════════════════════════════════════════════════════
-//  ÉTAT DES NOTIFICATIONS — persistant en base (et non en
-//  session), pour ne JAMAIS perdre le suivi entre deux
-//  connexions, onglets ou appareils différents.
-// ═══════════════════════════════════════════════════════
-function gala_notif_state(PDO $pdo): array {
-    $pdo->exec("CREATE TABLE IF NOT EXISTS admin_notif_state (
-        id INT PRIMARY KEY,
-        last_seen_messages DATETIME NULL,
-        last_seen_candidatures DATETIME NULL,
-        last_seen_commandes DATETIME NULL
-    )");
+$current_role  = $_SESSION['role']     ?? 'commercial';
+$current_user  = $_SESSION['username'] ?? 'Admin';
+$roleLabels    = ['admin' => 'Administrateur', 'rh' => 'Ressources Humaines', 'commercial' => 'Commercial'];
+$currentRoleLabel = $roleLabels[$current_role] ?? 'Utilisateur';
 
-    $row = $pdo->query("SELECT * FROM admin_notif_state WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+// Visibilité des catégories de notification selon le rôle
+$canSeeMsg   = in_array($current_role, ['admin', 'commercial'], true);
+$canSeeCand  = in_array($current_role, ['admin', 'rh'], true);
+$canSeeCmd     = in_array($current_role, ['admin', 'commercial'], true); // commandes : lien actif, accès autorisé
+$canSeeStock   = in_array($current_role, ['admin', 'commercial'], true); // stock visible par admin + commercial
+$stockLinkable = ($current_role === 'admin'); // lien products_manager réservé admin
+$firstTab    = $canSeeMsg ? 'msg' : ($canSeeCmd ? 'cmd' : ($canSeeCand ? 'cand' : 'stock'));
 
-    if (!$row) {
-        // Première activation : on considère l'historique existant comme "déjà vu"
-        // pour ne pas notifier d'un coup de dizaines d'anciennes entrées.
-        $pdo->exec("INSERT INTO admin_notif_state (id, last_seen_messages, last_seen_candidatures, last_seen_commandes)
-                    VALUES (1, NOW(), NOW(), NOW())");
-        $row = $pdo->query("SELECT * FROM admin_notif_state WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+// ── État "dernier vu" PERSISTANT (en base, lié au compte) ──
+// Survit aux reconnexions, contrairement à $_SESSION.
+function getLastSeen(PDO $pdo, string $username): array {
+    $epoch = '1970-01-01 00:00:00';
+    $defaults = [
+        'last_seen_messages_at'     => $epoch,
+        'last_seen_candidatures_at' => $epoch,
+        'last_seen_commandes_at'    => $epoch,
+    ];
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT
+                COALESCE(last_seen_messages_at,     '1970-01-01 00:00:00') AS last_seen_messages_at,
+                COALESCE(last_seen_candidatures_at, '1970-01-01 00:00:00') AS last_seen_candidatures_at,
+                COALESCE(last_seen_commandes_at,    '1970-01-01 00:00:00') AS last_seen_commandes_at
+             FROM users WHERE username = ?"
+        );
+        $stmt->execute([$username]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return $defaults;
+        // Sécurité : remplacer tout NULL résiduel
+        foreach ($defaults as $key => $fallback) {
+            if (empty($row[$key])) $row[$key] = $fallback;
+        }
+        return $row;
+    } catch (Exception $e) {
+        // Colonnes absentes → tout est "nouveau" → afficher tout
+        return $defaults;
     }
-
-    // Sécurité : si une colonne existait déjà mais est NULL (ex: ajout récent de la colonne commandes)
-    if (empty($row['last_seen_commandes'])) {
-        $pdo->exec("UPDATE admin_notif_state SET last_seen_commandes = NOW() WHERE id = 1");
-        $row['last_seen_commandes'] = date('Y-m-d H:i:s');
-    }
-
-    return $row;
 }
 
 // ═══════════════════════════════════════════════════════
 //  API JSON — NOTIFICATIONS EN TEMPS RÉEL
-//  (Messages de contact + Candidatures + Commandes)
 // ═══════════════════════════════════════════════════════
 if (isset($_GET['api'])) {
-    // On capture toute sortie parasite (warning PHP, BOM, espace...)
-    // pour qu'elle ne vienne jamais corrompre le JSON renvoyé.
-    ob_start();
+    header('Content-Type: application/json');
 
-    try {
-        $state = gala_notif_state($pdo);
+    if ($_GET['api'] === 'notifications') {
+        $seen = getLastSeen($pdo, $_SESSION['username'] ?? '');
+        $lastSeenMsg  = $seen['last_seen_messages_at'];
+        $lastSeenCand = $seen['last_seen_candidatures_at'];
+        $lastSeenCmd  = $seen['last_seen_commandes_at'];
 
-        if ($_GET['api'] === 'notifications') {
+        $msgs = $cands = $stockRows = $cmds = [];
+
+        // Messages : visibles par admin + commercial
+        if (in_array($current_role, ['admin', 'commercial'], true)) {
             $newMessages = $pdo->prepare(
                 "SELECT id, nom_complet, message, telephone, date_envoi
-                 FROM contacts WHERE date_envoi > ? ORDER BY date_envoi DESC LIMIT 8"
+                 FROM contacts WHERE date_envoi >= ? ORDER BY date_envoi DESC LIMIT 8"
             );
-            $newMessages->execute([$state['last_seen_messages']]);
+            $newMessages->execute([$lastSeenMsg]);
             $msgs = $newMessages->fetchAll(PDO::FETCH_ASSOC);
+        }
 
+        // Commandes : visibles par admin + commercial, avec lien (accès autorisé pour les deux)
+        if (in_array($current_role, ['admin', 'commercial'], true)) {
+            $newCommandes = $pdo->prepare(
+                "SELECT id, nom, prenom, region, nom_marche, date_commande
+                 FROM commandes WHERE date_commande >= ? ORDER BY date_commande DESC LIMIT 8"
+            );
+            $newCommandes->execute([$lastSeenCmd]);
+            $cmds = $newCommandes->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Stock : visible par admin + commercial uniquement (pas RH)
+        if (in_array($current_role, ['admin', 'commercial'], true)) {
+            $stockRows = $pdo->query(
+                "SELECT id, nom, format, stock FROM products WHERE stock = 0 ORDER BY nom ASC LIMIT 10"
+            )->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Candidatures : visibles par admin + rh
+        if (in_array($current_role, ['admin', 'rh'], true)) {
             $newCandidatures = $pdo->prepare(
                 "SELECT id, nom_complet, poste, email, telephone, created_at
-                 FROM candidatures WHERE created_at > ? ORDER BY created_at DESC LIMIT 8"
+                 FROM candidatures WHERE created_at >= ? ORDER BY created_at DESC LIMIT 8"
             );
-            $newCandidatures->execute([$state['last_seen_candidatures']]);
+            $newCandidatures->execute([$lastSeenCand]);
             $cands = $newCandidatures->fetchAll(PDO::FETCH_ASSOC);
-
-            $newCommandes = $pdo->prepare(
-                "SELECT id, nom, prenom, nom_marche, region, date_commande
-                 FROM commandes WHERE date_commande > ? ORDER BY date_commande DESC LIMIT 8"
-            );
-            $newCommandes->execute([$state['last_seen_commandes']]);
-            $cmds = $newCommandes->fetchAll(PDO::FETCH_ASSOC);
-
-            ob_end_clean();
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode([
-                'success'      => true,
-                'messages'     => $msgs,
-                'candidatures' => $cands,
-                'commandes'    => $cmds,
-                'total'        => count($msgs) + count($cands) + count($cmds)
-            ]);
-            exit;
         }
 
-        if ($_GET['api'] === 'mark_read') {
-            $type = $_GET['type'] ?? 'all';
-            $sets = [];
-            if ($type === 'all' || $type === 'messages')     $sets[] = "last_seen_messages = NOW()";
-            if ($type === 'all' || $type === 'candidatures') $sets[] = "last_seen_candidatures = NOW()";
-            if ($type === 'all' || $type === 'commandes')    $sets[] = "last_seen_commandes = NOW()";
-            if ($sets) {
-                $pdo->exec("UPDATE admin_notif_state SET " . implode(', ', $sets) . " WHERE id = 1");
-            }
-            ob_end_clean();
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['success' => true, 'ok' => true]);
-            exit;
-        }
-
-        ob_end_clean();
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'invalid_action']);
-        exit;
-
-    } catch (Throwable $e) {
-        ob_end_clean();
-        header('Content-Type: application/json; charset=utf-8');
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        echo json_encode([
+            'messages'     => $msgs,
+            'candidatures' => $cands,
+            'stock'        => $stockRows,
+            'commandes'    => $cmds,
+            'total'        => count($msgs) + count($cands) + count($stockRows) + count($cmds)
+        ]);
         exit;
     }
+
+    if ($_GET['api'] === 'mark_read') {
+        $now = date('Y-m-d H:i:s', time() - 2); // -2s pour ne pas rater les entrées simultanées
+        try {
+            $upd = $pdo->prepare(
+                "UPDATE users SET last_seen_messages_at = ?, last_seen_candidatures_at = ?, last_seen_commandes_at = ?
+                 WHERE username = ?"
+            );
+            $upd->execute([$now, $now, $now, $_SESSION['username'] ?? '']);
+            echo json_encode(['ok' => true]);
+        } catch (Exception $e) {
+            // Fallback session si colonnes absentes
+            $_SESSION['last_seen_messages_at']      = $now;
+            $_SESSION['last_seen_candidatures_at']  = $now;
+            $_SESSION['last_seen_commandes_at']     = $now;
+            echo json_encode(['ok' => false, 'msg' => 'Colonnes absentes. Exécutez notifications_migration.sql']);
+        }
+        exit;
+    }
+
+    // ── API GESTION UTILISATEURS (admin only) ──
+    if ($_GET['api'] === 'get_users' && $current_role === 'admin') {
+        try {
+            $users = $pdo->query("SELECT id, username, role FROM users ORDER BY role, username")->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'users' => $users]);
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'users' => [], 'msg' => 'Erreur SQL : ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($_GET['api'] === 'change_password' && $current_role === 'admin') {
+        header('Content-Type: application/json');
+        $data = json_decode(file_get_contents('php://input'), true);
+        $uid  = (int)($data['id']       ?? 0);
+        $pwd  = trim($data['password']  ?? '');
+        if (!$uid || strlen($pwd) < 6) {
+            echo json_encode(['ok'=>false,'msg'=>'Données invalides.']); exit;
+        }
+        try {
+            $hash = password_hash($pwd, PASSWORD_DEFAULT);
+            $s = $pdo->prepare("UPDATE users SET password=? WHERE id=? AND role!='admin'");
+            $s->execute([$hash, $uid]);
+            echo json_encode($s->rowCount()
+                ? ['ok'=>true, 'msg'=>'Mot de passe modifié avec succès.']
+                : ['ok'=>false,'msg'=>'Utilisateur introuvable ou non autorisé.']
+            );
+        } catch(Exception $e) {
+            echo json_encode(['ok'=>false,'msg'=>'Erreur base de données.']);
+        }
+        exit;
+    }
+
+    if ($_GET['api'] === 'create_user' && $current_role === 'admin') {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $uname = trim($data['username'] ?? '');
+        $pass  = trim($data['password'] ?? '');
+        $role  = $data['role'] ?? '';
+
+        if (!$uname || !$pass || !in_array($role, ['commercial','rh'], true)) {
+            echo json_encode(['ok' => false, 'msg' => 'Données invalides.']); exit;
+        }
+        if (strlen($pass) < 6) {
+            echo json_encode(['ok' => false, 'msg' => 'Mot de passe trop court (min. 6 caractères).']); exit;
+        }
+        try {
+            // Vérifier unicité
+            $chk = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+            $chk->execute([$uname]);
+            if ($chk->fetch()) {
+                echo json_encode(['ok' => false, 'msg' => 'Ce nom d\'utilisateur existe déjà.']); exit;
+            }
+            $hash = password_hash($pass, PASSWORD_DEFAULT);
+            $ins  = $pdo->prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)");
+            $ins->execute([$uname, $hash, $role]);
+            echo json_encode(['ok' => true, 'msg' => 'Compte créé avec succès.']);
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'msg' => 'Erreur SQL : ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($_GET['api'] === 'delete_user' && $current_role === 'admin') {
+        $data = json_decode(file_get_contents('php://input'), true);
+        $uid  = (int)($data['id'] ?? 0);
+        if (!$uid) { echo json_encode(['ok' => false, 'msg' => 'ID invalide.']); exit; }
+        try {
+            // Protéger son propre compte
+            $self = $pdo->prepare("SELECT username FROM users WHERE id = ?");
+            $self->execute([$uid]);
+            $row  = $self->fetch();
+            if ($row && $row['username'] === ($_SESSION['username'] ?? '')) {
+                echo json_encode(['ok' => false, 'msg' => 'Vous ne pouvez pas supprimer votre propre compte.']); exit;
+            }
+            $del = $pdo->prepare("DELETE FROM users WHERE id = ? AND role != 'admin'");
+            $del->execute([$uid]);
+            echo json_encode(['ok' => $del->rowCount() > 0, 'msg' => $del->rowCount() > 0 ? 'Compte supprimé.' : 'Suppression non autorisée.']);
+        } catch (Exception $e) {
+            echo json_encode(['ok' => false, 'msg' => 'Erreur SQL : ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // ── API JOURNAL D'ACTIVITÉ (admin only) ──
+    if ($_GET['api'] === 'get_activity_log' && $current_role === 'admin') {
+        $filter = $_GET['filter'] ?? 'all'; // all | commandes | candidatures
+        try {
+            if ($filter === 'commandes' || $filter === 'candidatures') {
+                $stmt = $pdo->prepare("SELECT * FROM activity_log WHERE table_concernee = ? ORDER BY created_at DESC LIMIT 100");
+                $stmt->execute([$filter]);
+            } else {
+                $stmt = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 100");
+            }
+            $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            echo json_encode(['ok' => true, 'logs' => $logs]);
+        } catch (Exception $e) {
+            // La table n'existe probablement pas encore
+            echo json_encode(['ok' => false, 'logs' => [], 'error' => 'table_missing']);
+        }
+        exit;
+    }
+
+    exit;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -122,30 +242,43 @@ $totalCandidatures = $pdo->query("SELECT COUNT(*) FROM candidatures")->fetchColu
 $totalCommandes    = $pdo->query("SELECT COUNT(*) FROM commandes")->fetchColumn();
 $totalProduits     = $pdo->query("SELECT COUNT(*) FROM products")->fetchColumn();
 
-// Notifications initiales (pour badge au tout premier chargement de la page)
-$notifState = gala_notif_state($pdo);
+// Produits en rupture de stock (stock = 0) — statut LIVE
+$ruptureProducts = $pdo->query(
+    "SELECT id, nom, format FROM products WHERE stock = 0 ORDER BY nom ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
+$ruptureCount = count($ruptureProducts);
 
-$initNewMsgs = $pdo->prepare("SELECT COUNT(*) FROM contacts WHERE date_envoi > ?");
-$initNewMsgs->execute([$notifState['last_seen_messages']]);
+// Notifications initiales (pour badge au chargement) — filtrées par rôle
+$seenInit     = getLastSeen($pdo, $current_user);
+$lastSeenMsg  = $seenInit['last_seen_messages_at'];
+$lastSeenCand = $seenInit['last_seen_candidatures_at'];
+$lastSeenCmd  = $seenInit['last_seen_commandes_at'];
+$initBadge = 0;
 
-$initNewCands = $pdo->prepare("SELECT COUNT(*) FROM candidatures WHERE created_at > ?");
-$initNewCands->execute([$notifState['last_seen_candidatures']]);
+if (in_array($current_role, ['admin', 'commercial'], true)) {
+    $initNewMsgs = $pdo->prepare("SELECT COUNT(*) FROM contacts WHERE date_envoi >= ?");
+    $initNewMsgs->execute([$lastSeenMsg]);
+    $initBadge += (int)$initNewMsgs->fetchColumn();
 
-$initNewCmds = $pdo->prepare("SELECT COUNT(*) FROM commandes WHERE date_commande > ?");
-$initNewCmds->execute([$notifState['last_seen_commandes']]);
+    $initNewCmds = $pdo->prepare("SELECT COUNT(*) FROM commandes WHERE date_commande >= ?");
+    $initNewCmds->execute([$lastSeenCmd]);
+    $initBadge += (int)$initNewCmds->fetchColumn();
 
-$initBadge = (int)$initNewMsgs->fetchColumn() + (int)$initNewCands->fetchColumn() + (int)$initNewCmds->fetchColumn();
+    $initBadge += $ruptureCount;
+}
+if (in_array($current_role, ['admin', 'rh'], true)) {
+    $initNewCands = $pdo->prepare("SELECT COUNT(*) FROM candidatures WHERE created_at >= ?");
+    $initNewCands->execute([$lastSeenCand]);
+    $initBadge += (int)$initNewCands->fetchColumn();
+}
 
-// Activités récentes unifiées (10 dernières) — messages + candidatures + commandes
+// Activités récentes unifiées (10 dernières)
 $recentActivity = $pdo->query("
     (SELECT 'message' AS type, id, nom_complet AS nom,
             message AS detail, date_envoi AS created_at FROM contacts ORDER BY date_envoi DESC LIMIT 5)
     UNION ALL
     (SELECT 'candidature' AS type, id, nom_complet AS nom,
             poste AS detail, created_at FROM candidatures ORDER BY created_at DESC LIMIT 5)
-    UNION ALL
-    (SELECT 'commande' AS type, id, TRIM(CONCAT(nom,' ',prenom)) AS nom,
-            CONCAT(nom_marche, ' · ', region) AS detail, date_commande AS created_at FROM commandes ORDER BY date_commande DESC LIMIT 5)
     ORDER BY created_at DESC LIMIT 10
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -166,7 +299,6 @@ $candidStatuts = $pdo->query("
 
 $current_page = 'dashboard.php';
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -225,106 +357,6 @@ body {
 .layout { display: flex; min-height: 100vh; }
 
 /* ═══════════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════════ */
-.sidebar {
-    width: var(--sidebar-w);
-    background: var(--dark);
-    position: fixed; top: 0; left: 0; bottom: 0;
-    display: flex; flex-direction: column;
-    z-index: 900;
-    transition: transform .38s cubic-bezier(.16,1,.3,1);
-    overflow: hidden;
-}
-.sidebar::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at 30% 0%, rgba(22,163,74,.18) 0%, transparent 60%);
-    pointer-events: none;
-}
-
-/* Brand */
-.sidebar-brand {
-    display: flex; align-items: center; gap: 12px;
-    padding: 24px 20px 20px;
-    border-bottom: 1px solid rgba(255,255,255,.06);
-    position: relative; z-index: 1;
-}
-.brand-logo {
-    width: 42px; height: 42px; border-radius: 13px;
-    background: linear-gradient(135deg, #16a34a, #22c55e);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 900; font-size: 18px; color: #fff;
-    box-shadow: 0 4px 16px rgba(22,163,74,.5), 0 0 0 1px rgba(34,197,94,.3);
-    flex-shrink: 0;
-}
-.brand-name { font-size: .95rem; font-weight: 800; color: #fff; letter-spacing: -.01em; }
-.brand-sub  { font-size: .58rem; font-weight: 600; color: rgba(255,255,255,.35);
-              text-transform: uppercase; letter-spacing: .14em; margin-top: 1px; }
-
-/* Nav sections */
-.nav-body { flex: 1; overflow-y: auto; padding: 12px 10px; scrollbar-width: none; position: relative; z-index: 1; }
-.nav-body::-webkit-scrollbar { display: none; }
-.nav-label {
-    font-size: .58rem; font-weight: 700; letter-spacing: .2em;
-    color: rgba(255,255,255,.25); text-transform: uppercase;
-    padding: 14px 12px 6px;
-}
-
-.nav-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 14px; border-radius: 12px; margin-bottom: 2px;
-    color: rgba(255,255,255,.55); font-weight: 500; font-size: .875rem;
-    text-decoration: none; position: relative;
-    transition: background .18s, color .18s, transform .15s;
-}
-.nav-item:hover  { background: rgba(255,255,255,.07); color: rgba(255,255,255,.9); }
-.nav-item.active { background: rgba(22,163,74,.22); color: #4ade80; font-weight: 600; }
-.nav-item.active::before {
-    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-    height: 60%; width: 3px; border-radius: 0 3px 3px 0;
-    background: linear-gradient(180deg, #16a34a, #22c55e);
-}
-.nav-icon {
-    width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px;
-    background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.08);
-    transition: background .18s;
-}
-.nav-item.active .nav-icon  { background: rgba(22,163,74,.3); border-color: rgba(34,197,94,.3); }
-.nav-item:hover .nav-icon   { background: rgba(255,255,255,.1); }
-.nav-text  { flex: 1; }
-.nav-badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 20px; height: 20px; padding: 0 6px;
-    border-radius: 10px; font-size: .65rem; font-weight: 700;
-    background: var(--red); color: #fff;
-}
-
-/* Sidebar footer */
-.sidebar-footer {
-    padding: 12px 10px 20px;
-    border-top: 1px solid rgba(255,255,255,.06);
-    position: relative; z-index: 1;
-}
-.nav-logout {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 14px; border-radius: 12px;
-    color: rgba(239,68,68,.7); font-weight: 600; font-size: .875rem;
-    text-decoration: none;
-    transition: background .18s, color .18s;
-}
-.nav-logout:hover { background: rgba(239,68,68,.1); color: #ef4444; }
-.nav-logout .nav-icon { border-color: rgba(239,68,68,.2); }
-
-/* ═══════════════════════════════════════════════
-   MAIN CONTENT
-═══════════════════════════════════════════════ */
-.main { margin-left: var(--sidebar-w); flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
-
-/* ═══════════════════════════════════════════════
    HEADER
 ═══════════════════════════════════════════════ */
 .header {
@@ -333,16 +365,12 @@ body {
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px;
-    padding: 0 clamp(14px, 4vw, 28px);
+    padding: 0 28px;
     position: sticky; top: 0; z-index: 800;
-    width: 100%;
 }
-.header-left { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
-.header-title { font-size: 1.1rem; font-weight: 700; color: var(--dark); letter-spacing: -.02em;
-                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.header-breadcrumb { font-size: .72rem; color: var(--slate); margin-top: 1px;
-                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-left { display: flex; align-items: center; gap: 16px; }
+.header-title { font-size: 1.1rem; font-weight: 700; color: var(--dark); letter-spacing: -.02em; }
+.header-breadcrumb { font-size: .72rem; color: var(--slate); margin-top: 1px; }
 
 /* Search */
 .search-wrap {
@@ -357,12 +385,12 @@ body {
 .search-wrap input::placeholder { color: #94a3b8; }
 .search-wrap i { color: #94a3b8; font-size: 13px; }
 
-.header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.header-actions { display: flex; align-items: center; gap: 10px; }
 
 /* ═══════════════════════════════════════════════
    NOTIFICATION BELL — SYSTÈME COMPLET 2026
 ═══════════════════════════════════════════════ */
-.notif-wrap { position: relative; flex-shrink: 0; }
+.notif-wrap { position: relative; }
 
 .notif-btn {
     width: 42px; height: 42px; border-radius: 12px;
@@ -416,7 +444,7 @@ body {
 /* Dropdown panel */
 .notif-dropdown {
     position: absolute; top: calc(100% + 10px); right: -10px;
-    width: min(380px, 90vw); max-height: 520px;
+    width: 380px; max-height: 520px;
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 20px;
@@ -437,7 +465,6 @@ body {
 
 .notif-header {
     display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 6px;
     padding: 16px 18px 12px;
     border-bottom: 1px solid var(--border);
 }
@@ -451,15 +478,15 @@ body {
 .notif-mark-all:hover { background: var(--green-light); }
 
 /* Tabs */
-.notif-tabs { display: flex; gap: 4px; padding: 10px 14px 0; }
+.notif-tabs { display: flex; gap: 4px; padding: 10px 12px 0; }
 .notif-tab {
-    flex: 1; padding: 8px 2px; border-radius: 10px;
+    flex: 1; padding: 8px 3px; border-radius: 10px;
     font-size: .68rem; font-weight: 600;
     border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 4px;
+    white-space: nowrap; overflow: hidden;
     transition: background .18s, color .18s;
     background: var(--bg); color: var(--slate);
-    white-space: nowrap;
 }
 .notif-tab.active { background: var(--dark); color: #fff; }
 .notif-tab-count {
@@ -500,7 +527,8 @@ body {
     background: linear-gradient(135deg, var(--green), #22c55e);
 }
 .notif-avatar.cand { background: linear-gradient(135deg, var(--blue), var(--purple)); }
-.notif-avatar.cmd  { background: linear-gradient(135deg, var(--amber), #f97316); }
+.notif-avatar.stock { background: linear-gradient(135deg, var(--amber), var(--red)); }
+.notif-avatar.cmd { background: linear-gradient(135deg, var(--green), var(--green-mid)); }
 .notif-item-body { flex: 1; min-width: 0; }
 .notif-item-name { font-size: .82rem; font-weight: 700; color: var(--dark);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -519,12 +547,11 @@ body {
 /* Footer buttons */
 .notif-footer { padding: 10px 14px 14px; display: flex; gap: 8px; }
 .notif-footer-btn {
-    flex: 1; padding: 9px 4px; border-radius: 10px; font-size: .68rem;
+    flex: 1; padding: 9px; border-radius: 10px; font-size: .75rem;
     font-weight: 600; border: none; cursor: pointer;
     text-align: center; text-decoration: none;
-    display: flex; align-items: center; justify-content: center; gap: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
     transition: background .18s, transform .12s;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .notif-footer-btn:active { transform: scale(.97); }
 .notif-footer-btn.primary { background: var(--dark); color: #fff; }
@@ -540,14 +567,119 @@ body {
     color: #fff; font-weight: 800; font-size: .82rem; cursor: pointer;
     border: 2px solid var(--border);
     transition: border-color .2s, transform .15s;
-    flex-shrink: 0;
+    flex-shrink: 0; position: relative;
+    padding: 0; outline: none; font-family: inherit;
 }
 .admin-avatar:hover { border-color: var(--green); transform: scale(1.04); }
+.admin-avatar::after {
+    content: ''; position: absolute; bottom: -2px; right: -2px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #22c55e; border: 2px solid #fff;
+}
+
+/* ══ MENU COMPTE (account dropdown) ══ */
+.account-wrap { position: relative; flex-shrink: 0; }
+.account-dropdown {
+    position: absolute; top: calc(100% + 10px); right: -6px;
+    width: 270px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    z-index: 9999;
+    transform-origin: top right;
+    transform: scale(.92) translateY(-8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .22s cubic-bezier(.16,1,.3,1), opacity .18s ease;
+}
+.account-dropdown.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: auto; }
+
+.account-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 16px 14px;
+    background: linear-gradient(135deg, #f8fafc, #f0fdf4);
+    border-bottom: 1px solid var(--border);
+}
+.account-head-avatar {
+    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: .9rem;
+    position: relative;
+}
+.account-head-avatar::after {
+    content: ''; position: absolute; bottom: -2px; right: -2px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #22c55e; border: 2px solid #fff;
+}
+.account-head-info { flex: 1; min-width: 0; }
+.account-head-name { font-size: .87rem; font-weight: 800; color: var(--dark);
+                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-head-status { font-size: .68rem; color: #16a34a; font-weight: 600; margin-top: 2px;
+                        display: flex; align-items: center; gap: 5px; }
+.account-head-status .dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+
+.account-menu { padding: 8px; }
+.account-menu-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 11px; border-radius: 11px;
+    color: #334155; font-weight: 600; font-size: .82rem;
+    text-decoration: none; cursor: pointer; border: none; background: none;
+    width: 100%; text-align: left; font-family: inherit;
+    transition: background .16s, color .16s;
+}
+.account-menu-item:hover { background: var(--bg); color: var(--dark); }
+.account-menu-item i:first-child { width: 17px; text-align: center; color: #64748b; font-size: 13px; }
+.account-menu-item:hover i:first-child { color: var(--green); }
+.account-menu-item.danger { color: #dc2626; }
+.account-menu-item.danger i:first-child { color: #ef4444; }
+.account-menu-item.danger:hover { background: #fef2f2; }
+.account-menu-divider { height: 1px; background: var(--border); margin: 6px 4px; }
+
+/* ══ JOURNAL D'ACTIVITÉ ══ */
+.log-filters { display: flex; gap: 6px; }
+.log-filter-btn {
+    flex: 1; padding: 8px 6px; border-radius: 10px;
+    font-size: .74rem; font-weight: 700; text-align: center;
+    border: 1.5px solid var(--border); background: #fff; color: var(--slate);
+    cursor: pointer; transition: background .16s, color .16s, border-color .16s;
+}
+.log-filter-btn.active { background: var(--dark); color: #fff; border-color: var(--dark); }
+
+.log-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.log-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px; border-radius: 13px;
+    background: #fff; border: 1px solid var(--border);
+}
+.log-icon {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px;
+}
+.log-icon.commandes     { background: linear-gradient(135deg,#3b82f6,#60a5fa); }
+.log-icon.candidatures  { background: linear-gradient(135deg,#8b5cf6,#a78bfa); }
+.log-body { flex: 1; min-width: 0; }
+.log-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.log-user { font-size: .82rem; font-weight: 700; color: var(--dark); }
+.log-time { font-size: .68rem; color: #94a3b8; font-weight: 500; flex-shrink: 0; }
+.log-details { font-size: .78rem; color: #475569; margin-top: 3px; line-height: 1.4; }
+.log-list-empty { text-align: center; padding: 30px 20px; color: #94a3b8; font-size: .82rem; font-weight: 500; }
+.log-list-empty i { font-size: 26px; opacity: .35; display: block; margin-bottom: 10px; }
+.log-warn-banner {
+    background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+    border-radius: 12px; padding: 12px 14px; font-size: .78rem; font-weight: 600;
+    display: flex; align-items: flex-start; gap: 10px; line-height: 1.5;
+}
+.log-warn-banner i { margin-top: 1px; }
+.log-warn-banner code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px; font-size: .76rem; }
 
 /* ═══════════════════════════════════════════════
    CONTENT AREA
 ═══════════════════════════════════════════════ */
-.content { flex: 1; min-width: 0; padding: clamp(14px, 4vw, 28px); max-width: 1400px; width: 100%; margin: 0 auto; }
+.content { flex: 1; padding: 28px; max-width: 1400px; width: 100%; }
 
 /* Page header */
 .page-hero { margin-bottom: 26px; }
@@ -566,6 +698,50 @@ body {
    KPI CARDS
 ═══════════════════════════════════════════════ */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+/* ═══════════════════════════════════════════════
+   ALERTE RUPTURE DE STOCK — bannière dashboard
+═══════════════════════════════════════════════ */
+.stock-alert {
+    display: flex; align-items: flex-start; gap: 16px;
+    background: linear-gradient(135deg, #fff7ed, #fef2f2);
+    border: 1px solid #fed7aa;
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+.stock-alert-icon {
+    width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--amber), var(--red));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 18px;
+    box-shadow: 0 4px 14px rgba(239,68,68,.25);
+}
+.stock-alert-body { flex: 1; min-width: 0; }
+.stock-alert-title { font-size: .92rem; font-weight: 800; color: #9a3412; margin-bottom: 8px; }
+.stock-alert-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.stock-alert-chip {
+    font-size: .72rem; font-weight: 600; color: #9a3412;
+    background: rgba(255,255,255,.7); border: 1px solid #fed7aa;
+    border-radius: 8px; padding: 4px 10px;
+}
+.stock-alert-chip.more { background: #9a3412; color: #fff; border-color: #9a3412; }
+.stock-alert-action {
+    flex-shrink: 0; align-self: center;
+    display: flex; align-items: center; gap: 7px;
+    background: var(--dark); color: #fff;
+    font-size: .78rem; font-weight: 700;
+    padding: 10px 16px; border-radius: 11px;
+    text-decoration: none; white-space: nowrap;
+    transition: background .18s, transform .15s;
+}
+.stock-alert-action:hover { background: #1e293b; transform: translateY(-1px); }
+
+@media (max-width: 640px) {
+    .stock-alert { flex-direction: column; gap: 12px; padding: 16px; }
+    .stock-alert-action { align-self: stretch; justify-content: center; }
+}
 
 .kpi-card {
     background: var(--white);
@@ -655,7 +831,6 @@ body {
 }
 .activity-dot.msg  { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
 .activity-dot.cand { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
-.activity-dot.cmd  { background: linear-gradient(135deg, #f59e0b, #fb923c); }
 .activity-info { flex: 1; min-width: 0; }
 .activity-name { font-size: .82rem; font-weight: 700; color: var(--dark);
                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -670,7 +845,6 @@ body {
 }
 .type-tag.msg  { background: #dbeafe; color: #1d4ed8; }
 .type-tag.cand { background: #ede9fe; color: #6d28d9; }
-.type-tag.cmd  { background: #fef3c7; color: #b45309; }
 
 /* Full activity table */
 .section-full { margin-bottom: 24px; }
@@ -678,134 +852,423 @@ body {
 /* ═══════════════════════════════════════════════
    HAMBURGER (mobile)
 ═══════════════════════════════════════════════ */
-#admin-menu-btn {
-    width: 42px; height: 42px;
-    display: none; flex-direction: column;
-    align-items: center; justify-content: center; gap: 5px;
-    background: var(--bg); border: 1.5px solid var(--border);
-    border-radius: 12px; cursor: pointer;
-    transition: background .25s, border-color .25s, transform .15s;
-}
-#admin-menu-btn:active { transform: scale(.93); }
-#admin-menu-btn.open { background: var(--green-light); border-color: rgba(22,163,74,.3); }
-.abar {
-    display: block; height: 2px; border-radius: 99px;
-    background: var(--dark); transform-origin: center;
-    transition: transform .4s cubic-bezier(.23,1,.32,1), opacity .25s, width .3s;
-}
-.abar:nth-child(1) { width: 20px; }
-.abar:nth-child(2) { width: 14px; align-self: flex-start; margin-left: 9px; }
-.abar:nth-child(3) { width: 18px; }
-#admin-menu-btn.open .abar:nth-child(1) { width: 20px; transform: translateY(7px) rotate(45deg); }
-#admin-menu-btn.open .abar:nth-child(2) { opacity: 0; transform: scaleX(0); }
-#admin-menu-btn.open .abar:nth-child(3) { width: 20px; transform: translateY(-7px) rotate(-45deg); }
 
-#side-overlay {
-    position: fixed; inset: 0; z-index: 850;
-    background: transparent; pointer-events: none;
-    transition: background .35s;
-}
-#side-overlay.active { background: rgba(15,23,42,.65); pointer-events: auto; }
+/* ══════════════════════════════════════════════════
+   RESPONSIVE — STRATÉGIE 3 PALIERS
+   Desktop ≥1025 : sidebar 260px, hamburger caché
+   Tablette 769–1024 : sidebar 72px icônes, hamburger caché
+   Mobile ≤768 : drawer off-screen, hamburger visible
+══════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════
-   RESPONSIVE — 4 PALIERS
-   1024px → tablette (sidebar en tiroir)
-    768px → mobile large (grilles 1 colonne, donut empilé)
-    480px → mobile standard (compact)
-    360px → très petit écran
-═══════════════════════════════════════════════ */
+/* ── Tablette 769–1024px ── */
+@media (max-width: 1024px) and (min-width: 769px) {
+    :root { --sidebar-w: 72px; }
 
-/* ── 1024px : Tablette — sidebar devient un tiroir ── */
-@media (max-width: 1024px) {
-    .sidebar { transform: translateX(-105%); }
-    .sidebar.open { transform: translateX(0); }
-    .main { margin-left: 0; }
-    #admin-menu-btn { display: flex; }
+    .sidebar { width: 72px; overflow: visible; }
+    .sidebar-brand { padding: 18px 10px; justify-content: center; }
+    .brand-name, .brand-sub { display: none; }
+    .nav-label { display: none; }
+    .nav-item { justify-content: center; padding: 11px; margin-bottom: 3px; }
+    .nav-item .nav-text,
+    .nav-item .nav-badge { display: none; }
+    .nav-icon { width: 38px; height: 38px; font-size: 15px; margin: 0 auto; }
+    .nav-item:hover::after {
+        content: attr(data-label);
+        position: absolute; left: calc(100% + 14px); top: 50%;
+        transform: translateY(-50%);
+        white-space: nowrap;
+        background: #0f172a; color: #fff;
+        font-size: .76rem; font-weight: 600;
+        padding: 7px 13px; border-radius: 9px;
+        box-shadow: 0 4px 16px rgba(0,0,0,.22);
+        pointer-events: none; z-index: 9999;
+    }
+    .nav-item:hover::before { display: none; }
+    .nav-item.active::after { display: none; }
+    .nav-logout { justify-content: center; padding: 11px; }
+    .nav-logout span { display: none; }
+    .nav-logout .nav-icon { margin: 0 auto; }
+
+    #admin-menu-btn { display: none !important; }
+
     .search-wrap { width: 180px; }
     .section-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .header-title { font-size: .95rem; }
+    .header-breadcrumb { font-size: .65rem; }
 }
 
-/* ── 768px : Mobile large ── */
+/* ── Mobile ≤768px — DRAWER ── */
 @media (max-width: 768px) {
-    .header { gap: 10px; }
-    .header-left { gap: 12px; }
-    .header-title { font-size: 1rem; }
-    .header-breadcrumb {
-        max-width: 200px; overflow: hidden;
-        text-overflow: ellipsis; white-space: nowrap;
+    :root { --sidebar-w: 0px; }
+
+    /* La sidebar sort de l'écran vers la gauche */
+    .sidebar {
+        width: 270px;
+        transform: translateX(-100%);
+        overflow: hidden;
+        /* Force le mode "texte complet" — écrase tout ce que tablette avait changé */
     }
+    /* Quand ouverte, elle revient à 0 */
+    .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 10px 0 40px rgba(0,0,0,.22);
+    }
+
+    /* === Forcer le mode "texte complet" dans le drawer === */
+    .sidebar .sidebar-brand {
+        padding: 22px 20px 18px !important;
+        justify-content: flex-start !important;
+    }
+    .sidebar .brand-name { display: block !important; }
+    .sidebar .brand-sub  { display: block !important; }
+    .sidebar .nav-label  { display: block !important; padding: 14px 12px 5px !important; }
+    .sidebar .nav-item {
+        justify-content: flex-start !important;
+        padding: 10px 13px !important;
+        margin-bottom: 2px !important;
+    }
+    .sidebar .nav-item .nav-text  { display: inline !important; }
+    .sidebar .nav-item .nav-badge { display: inline-flex !important; }
+    .sidebar .nav-icon { width: 34px !important; height: 34px !important; margin: 0 !important; font-size: 13px !important; }
+    .sidebar .nav-logout { justify-content: flex-start !important; padding: 10px 13px !important; }
+    .sidebar .nav-logout span { display: inline !important; }
+    /* Pas de tooltip dans le drawer */
+    .sidebar .nav-item:hover::after { content: none !important; display: none !important; }
+
+    /* Main prend toute la largeur */
+    .main { margin-left: 0 !important; }
+
+    /* Hamburger visible */
+    #admin-menu-btn { display: flex !important; }
+
+    /* Header compact */
+    .header { padding: 0 14px; height: 60px; }
+    .header-title { font-size: .9rem; }
+    .header-breadcrumb { font-size: .6rem; }
+    .search-wrap { display: none !important; }
     .header-actions { gap: 8px; }
-    .search-wrap { width: 130px; padding: 8px 12px; }
 
-    .page-hero h1 { font-size: 1.4rem; }
-    .page-hero-bar { align-items: flex-start; }
+    /* Content */
+    .content { padding: 14px; }
 
-    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-    .kpi-card { padding: 18px 16px 14px; }
-    .kpi-value { font-size: 1.85rem; }
-    .kpi-icon { width: 40px; height: 40px; font-size: 16px; }
-
-    .card-head { padding: 16px 18px 12px; flex-wrap: wrap; gap: 8px; }
-    .card-body { padding: 16px 18px; }
-
-    /* Donut + légende s'empilent au lieu de côte à côte */
-    .donut-body {
-        flex-direction: column !important;
-        gap: 14px !important;
-    }
-}
-
-/* ── 480px : Mobile standard ── */
-@media (max-width: 480px) {
-    .header { height: 60px; }
-    .header-title { font-size: .92rem; }
-    .header-breadcrumb { font-size: .65rem; max-width: 140px; }
-    .search-wrap { display: none; }   /* place réservée aux notifs + avatar */
-
-    .page-hero { margin-bottom: 18px; }
-    .page-hero h1 { font-size: 1.25rem; }
-    .page-hero p { font-size: .78rem; }
-    .date-chip { font-size: .7rem; padding: 6px 10px; }
-
-    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
-    .kpi-card { padding: 15px 14px 12px; border-radius: 14px; }
+    /* KPI 2 colonnes */
+    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .kpi-card { padding: 15px 13px 12px; }
+    .kpi-value { font-size: 1.7rem; }
+    .kpi-label { font-size: .66rem; }
+    .kpi-icon { width: 36px; height: 36px; font-size: 14px; }
+    .kpi-trend { font-size: .6rem; padding: 3px 6px; }
     .kpi-top { margin-bottom: 10px; }
-    .kpi-icon { width: 36px; height: 36px; font-size: 14px; border-radius: 10px; }
-    .kpi-value { font-size: 1.5rem; }
-    .kpi-label { font-size: .65rem; }
-    .kpi-trend { font-size: .6rem; padding: 3px 7px; }
 
+    /* Hero */
+    .page-hero { margin-bottom: 14px; }
+    .page-hero h1 { font-size: 1.15rem; }
+    .page-hero p { font-size: .75rem; }
+    .page-hero-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .date-chip { font-size: .69rem; padding: 5px 10px; }
+
+    /* Section grid colonnes */
+    .section-grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+    .section-full { margin-bottom: 14px; }
+
+    /* Cards */
+    .card-head { padding: 13px 15px 10px; flex-wrap: wrap; gap: 8px; }
+    .card-body { padding: 12px 14px; }
     .card-title { font-size: .82rem; }
-    .card-sub { font-size: .65rem; }
-    .card-action { font-size: .68rem; padding: 5px 10px; }
+    .card-sub   { font-size: .67rem; }
 
-    /* Dropdown notifications : passe en plein écran ancré sous le header */
-    .notif-dropdown {
-        position: fixed;
-        top: calc(var(--header-h) + 8px);
-        left: 12px; right: 12px;
-        width: auto;
-        max-height: calc(100vh - var(--header-h) - 24px);
+    /* Alerte stock */
+    .stock-alert {
+        flex-direction: column; gap: 10px;
+        padding: 14px; margin-bottom: 16px;
     }
+    .stock-alert-action { align-self: stretch; justify-content: center; }
 
-    .activity-name, .activity-detail { font-size: .76rem; }
-    .activity-dot { width: 30px; height: 30px; font-size: 11px; }
+    /* Activité */
+    .activity-item { padding: 9px 0; }
+    .activity-dot  { width: 30px; height: 30px; font-size: 11px; }
+    .activity-name   { font-size: .79rem; }
+    .activity-detail { font-size: .69rem; }
+    .activity-time   { font-size: .61rem; }
+    .type-tag { font-size: .57rem; }
+
+    /* Notification dropdown : fixé en haut plein écran */
+    .notif-dropdown {
+        position: fixed !important;
+        top: 62px; left: 8px; right: 8px;
+        width: auto !important;
+        max-height: 74vh;
+        border-radius: 16px;
+    }
 }
 
-/* ── 380px : protège les onglets de notifications (libellés FR plus longs) ── */
-@media (max-width: 380px) {
-    .notif-tab { font-size: .68rem; gap: 4px; padding: 7px 3px; }
+/* ── Très petits écrans ≤420px ── */
+@media (max-width: 420px) {
+    .kpi-card { padding: 12px 10px; }
+    .kpi-value { font-size: 1.5rem; }
+    .kpi-icon { width: 32px; height: 32px; font-size: 12px; }
+    .header-actions { gap: 5px; }
+    .content { padding: 10px; }
+    .notif-btn { width: 36px; height: 36px; }
+    .admin-avatar { width: 34px; height: 34px; font-size: .76rem; }
+    .btn-users { width: 36px; height: 36px; }
+}
+
+/* ── Onglets de la cloche : jusqu'à 4 catégories possibles (Messages/Commandes/Recrutements/Stock) ── */
+@media (max-width: 400px) {
+    .notif-tab { font-size: .6rem; gap: 2px; padding: 7px 2px; }
     .notif-tab i { display: none; }
     .notif-header-title { font-size: .85rem; }
-    .notif-mark-all { font-size: .68rem; padding: 4px 8px; }
+    .notif-mark-all { font-size: .65rem; padding: 4px 8px; }
 }
 
-/* ── 360px : très petits écrans ── */
+/* ── Très petits ≤360px : KPI 1 colonne ── */
 @media (max-width: 360px) {
     .kpi-grid { grid-template-columns: 1fr; }
-    .kpi-card { padding: 14px 16px; }
-    .header-breadcrumb { display: none; }
-    .sidebar { width: min(260px, 86vw); }
+    .kpi-value { font-size: 1.9rem; }
+}
+
+
+
+/* ══════════════════════════════════════
+   MODAL CHANGEMENT MOT DE PASSE
+══════════════════════════════════════ */
+.pwd-modal-bg {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(15,23,42,.65);
+    backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .28s ease;
+}
+.pwd-modal-bg.open { opacity: 1; pointer-events: auto; }
+.pwd-modal-box {
+    background: #fff; border-radius: 22px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 32px 80px rgba(0,0,0,.22);
+    transform: translateY(20px) scale(.97);
+    transition: transform .3s cubic-bezier(.16,1,.3,1), opacity .3s;
+    opacity: 0; overflow: hidden;
+}
+.pwd-modal-bg.open .pwd-modal-box { transform: none; opacity: 1; }
+
+.pwd-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 24px 0;
+}
+.pwd-modal-head-left { display: flex; align-items: center; gap: 14px; }
+.pwd-modal-icon {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg,#0f172a,#1e293b);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 16px rgba(15,23,42,.3);
+}
+.pwd-modal-icon i { color: #4ade80; font-size: 17px; }
+.pwd-modal-title { font-size: 1.05rem; font-weight: 800; color: #0f172a; }
+.pwd-modal-sub   { font-size: .72rem; color: #64748b; margin-top: 2px; }
+.pwd-modal-close {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    display: flex; align-items: center; justify-content: center;
+    color: #64748b; cursor: pointer; font-size: 14px;
+    transition: background .15s, color .15s;
+}
+.pwd-modal-close:hover { background: #fee2e2; color: #ef4444; border-color: #fecaca; }
+
+.pwd-modal-body { padding: 22px 24px 28px; }
+
+/* ── User selector ── */
+.pwd-user-select-wrap { position: relative; margin-bottom: 20px; }
+.pwd-user-select-wrap i {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: #94a3b8; font-size: 12px; pointer-events: none;
+}
+.pwd-user-select {
+    width: 100%; padding: 11px 12px 11px 38px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; font-size: .875rem; font-weight: 600; color: #0f172a;
+    outline: none; appearance: none;
+    transition: border-color .18s, background .18s, box-shadow .18s;
+}
+.pwd-user-select:focus {
+    border-color: #16a34a; background: #fff;
+    box-shadow: 0 0 0 3px rgba(22,163,74,.1);
+}
+
+/* ── Fields ── */
+.pwd-fields { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.pwd-field  { display: flex; flex-direction: column; gap: 5px; }
+.pwd-field-label {
+    font-size: .67rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: #64748b;
+}
+.pwd-field-wrap { position: relative; }
+.pwd-field-input {
+    width: 100%; padding: 11px 44px 11px 14px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; font-size: .875rem; font-weight: 500; color: #0f172a;
+    outline: none; transition: border-color .18s, box-shadow .18s, background .18s;
+}
+.pwd-field-input:focus {
+    border-color: #16a34a; background: #fff;
+    box-shadow: 0 0 0 3px rgba(22,163,74,.1);
+}
+.pwd-field-input.err { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.1); }
+.pwd-eye-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: #94a3b8; font-size: 13px; padding: 4px;
+    transition: color .15s;
+}
+.pwd-eye-btn:hover { color: #475569; }
+
+/* Strength bar */
+.pwd-strength { margin-top: 6px; }
+.pwd-strength-bar {
+    height: 4px; border-radius: 3px; background: #e2e8f0;
+    overflow: hidden; margin-bottom: 4px;
+}
+.pwd-strength-fill { height: 100%; border-radius: 3px; width: 0; transition: width .3s, background .3s; }
+.pwd-strength-text { font-size: .62rem; font-weight: 600; color: #94a3b8; }
+
+/* Alert inside modal */
+.pwd-alert {
+    display: none; align-items: center; gap: 10px;
+    padding: 11px 14px; border-radius: 11px;
+    font-size: .8rem; font-weight: 600; margin-bottom: 16px;
+}
+.pwd-alert.ok  { display: flex; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.pwd-alert.err { display: flex; background: #fff1f2; color: #dc2626; border: 1px solid #fecada; }
+
+/* Divider */
+.pwd-divider {
+    border: none; border-top: 1px solid #f1f5f9; margin: 20px 0;
+}
+
+/* Submit */
+.pwd-submit {
+    width: 100%; padding: 13px;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #fff; font-weight: 800; font-size: .9rem;
+    border: none; border-radius: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 4px 14px rgba(15,23,42,.28);
+    transition: transform .15s, box-shadow .2s, background .2s;
+}
+.pwd-submit:hover { background: linear-gradient(135deg,#16a34a,#15803d); box-shadow: 0 6px 20px rgba(22,163,74,.3); }
+.pwd-submit:active { transform: scale(.97); }
+.pwd-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ══ MODAL UTILISATEURS ══ */
+.modal-bg {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(2,6,23,.65); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s;
+}
+.modal-bg.open { opacity: 1; pointer-events: auto; }
+.modal-box {
+    background: #fff; border-radius: 24px;
+    width: 100%; max-width: 560px;
+    max-height: 90vh; overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,.2);
+    transform: scale(.94) translateY(10px);
+    transition: transform .3s cubic-bezier(.16,1,.3,1);
+}
+.modal-bg.open .modal-box { transform: scale(1) translateY(0); }
+.modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 24px 18px; border-bottom: 1px solid #f1f5f9;
+    background: linear-gradient(135deg, #f8fafc, #f0fdf4); flex-shrink: 0;
+}
+.modal-head-title { font-size: 1rem; font-weight: 800; color: var(--dark); display: flex; align-items: center; gap: 10px; }
+.modal-head-icon { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg,#16a34a,#22c55e); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; }
+.modal-close { width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 13px; cursor: pointer; transition: background .2s, color .2s; }
+.modal-close:hover { background: #fee2e2; color: #dc2626; }
+.modal-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+/* Form */
+.form-section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px 20px; }
+.form-section-title { font-size: .72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 14px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-field label { font-size: .75rem; font-weight: 700; color: #475569; }
+.form-input {
+    padding: 10px 14px; border-radius: 10px;
+    border: 1.5px solid #e2e8f0; background: #fff;
+    font-size: .84rem; font-family: inherit; color: #1e293b;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+    width: 100%;
+}
+.form-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.form-select { padding: 10px 14px; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #fff; font-size: .84rem; font-family: inherit; color: #1e293b; outline: none; transition: border-color .2s; width: 100%; appearance: none; cursor: pointer; }
+.form-select:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.btn-create {
+    width: 100%; padding: 12px; border-radius: 12px;
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff; font-weight: 800; font-size: .88rem;
+    border: none; cursor: pointer; letter-spacing: .01em;
+    transition: opacity .2s, transform .15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-create:hover { opacity: .92; transform: translateY(-1px); }
+.btn-create:active { transform: scale(.98); }
+.btn-create:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Alerte modale */
+.modal-alert { padding: 10px 14px; border-radius: 10px; font-size: .8rem; font-weight: 600; display: none; }
+.modal-alert.ok  { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; display: flex; align-items: center; gap: 7px; }
+.modal-alert.err { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; display: flex; align-items: center; gap: 7px; }
+
+/* Liste utilisateurs */
+.users-section { display: flex; flex-direction: column; gap: 10px; }
+.users-section-title { font-size: .72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: .12em; }
+.user-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+.user-card {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border-radius: 12px;
+    background: #fff; border: 1px solid #e2e8f0;
+    transition: border-color .2s;
+}
+.user-card:hover { border-color: #cbd5e1; }
+.user-card-avatar {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: .8rem; color: #fff;
+}
+.user-card-avatar.commercial { background: linear-gradient(135deg,#f59e0b,#d97706); }
+.user-card-avatar.rh         { background: linear-gradient(135deg,#8b5cf6,#7c3aed); }
+.user-card-info { flex: 1; min-width: 0; }
+.user-card-name { font-size: .84rem; font-weight: 700; color: #1e293b; }
+.user-card-role { font-size: .68rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .08em; margin-top: 1px; }
+.role-chip { padding: 3px 9px; border-radius: 7px; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.role-chip.commercial { background: #fef3c7; color: #92400e; }
+.role-chip.rh         { background: #ede9fe; color: #5b21b6; }
+.role-chip.admin      { background: #dcfce7; color: #14532d; }
+.btn-del-user { width: 30px; height: 30px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; background: #fff5f5; color: #dc2626; font-size: 11px; transition: background .2s; flex-shrink: 0; }
+.btn-del-user:hover { background: #fee2e2; }
+.user-list-empty { text-align: center; padding: 20px; color: #94a3b8; font-size: .8rem; font-weight: 500; }
+
+/* Bouton Users header */
+.btn-users {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: var(--bg); border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--slate); font-size: 15px;
+    transition: background .2s, border-color .2s, color .2s, transform .15s;
+}
+.btn-users:hover { background: #fff; border-color: var(--green); color: var(--green); transform: scale(1.04); }
+
+@media (max-width: 640px) {
+    .modal-box { border-radius: 20px; max-height: 92vh; }
+    .modal-head { padding: 16px 18px 14px; }
+    .modal-body { padding: 16px 18px; }
+    .form-row { grid-template-columns: 1fr; }
 }
 
 /* Loading skeleton */
@@ -831,75 +1294,9 @@ body {
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     OVERLAY MOBILE
-═══════════════════════════════════════════════ -->
-<div id="side-overlay"></div>
-
 <div class="layout">
 
-<!-- ═══════════════════════════════════════════════
-     SIDEBAR
-═══════════════════════════════════════════════ -->
-<aside class="sidebar" id="sidebar" role="navigation" aria-label="Navigation admin">
-    <div class="sidebar-brand">
-        <div class="brand-logo">G</div>
-        <div>
-            <div class="brand-name">Gala Agro</div>
-            <div class="brand-sub">Administration</div>
-        </div>
-    </div>
-
-    <nav class="nav-body">
-        <div class="nav-label">Principal</div>
-
-        <a href="dashboard.php" class="nav-item active">
-            <div class="nav-icon"><i class="fas fa-chart-pie"></i></div>
-            <span class="nav-text">Tableau de bord</span>
-        </a>
-
-        <a href="admin_commandes.php" class="nav-item" id="nav-cmd">
-            <div class="nav-icon"><i class="fas fa-shopping-bag"></i></div>
-            <span class="nav-text">Commandes</span>
-            <span class="nav-badge" id="sidebar-cmd-badge" style="display:none">0</span>
-        </a>
-
-        <a href="products_manager.php" class="nav-item">
-            <div class="nav-icon"><i class="fas fa-box-open"></i></div>
-            <span class="nav-text">Produits</span>
-        </a>
-
-        <div class="nav-label">Clients & RH</div>
-
-        <a href="messages.php" class="nav-item" id="nav-messages">
-            <div class="nav-icon"><i class="fas fa-envelope"></i></div>
-            <span class="nav-text">Messages</span>
-            <span class="nav-badge" id="sidebar-msg-badge" style="display:none">0</span>
-        </a>
-
-        <a href="voir_candidatures.php" class="nav-item" id="nav-cand">
-            <div class="nav-icon"><i class="fas fa-user-tie"></i></div>
-            <span class="nav-text">Candidatures</span>
-            <span class="nav-badge" id="sidebar-cand-badge" style="display:none">0</span>
-        </a>
-
-        <div class="nav-label">Contenu</div>
-
-        <a href="gallery.php" class="nav-item">
-            <div class="nav-icon"><i class="fas fa-images"></i></div>
-            <span class="nav-text">Galerie</span>
-        </a>
-    </nav>
-
-    <div class="sidebar-footer">
-        <a href="logout.php" class="nav-logout">
-            <div class="nav-icon" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.18);">
-                <i class="fas fa-sign-out-alt" style="color:#ef4444;"></i>
-            </div>
-            <span>Déconnexion</span>
-        </a>
-    </div>
-</aside>
+<?php include 'sidebar_nav.php'; ?>
 
 <!-- ═══════════════════════════════════════════════
      MAIN
@@ -918,7 +1315,7 @@ body {
 
             <div>
                 <div class="header-title">Tableau de bord</div>
-                <div class="header-breadcrumb">Bienvenue, Admin — <span id="live-time"></span></div>
+                <div class="header-breadcrumb">Bienvenue, <?= htmlspecialchars($current_user) ?> · <?= htmlspecialchars($currentRoleLabel) ?> — <span id="live-time"></span></div>
             </div>
         </div>
 
@@ -954,60 +1351,134 @@ body {
 
                     <!-- Tabs -->
                     <div class="notif-tabs">
-                        <button class="notif-tab active" id="tabMsg" onclick="switchTab('msg')">
+                        <?php if ($canSeeMsg): ?>
+                        <button class="notif-tab <?= $firstTab === 'msg' ? 'active' : '' ?>" id="tabMsg" onclick="switchTab('msg')">
                             <i class="fas fa-envelope" style="font-size:11px;"></i> Messages
                             <span class="notif-tab-count" id="tabMsgCount">0</span>
                         </button>
-                        <button class="notif-tab" id="tabCand" onclick="switchTab('cand')">
-                            <i class="fas fa-user-tie" style="font-size:11px;"></i> Recrutements
-                            <span class="notif-tab-count" id="tabCandCount">0</span>
-                        </button>
-                        <button class="notif-tab" id="tabCmd" onclick="switchTab('cmd')">
+                        <?php endif; ?>
+                        <?php if ($canSeeCmd): ?>
+                        <button class="notif-tab <?= $firstTab === 'cmd' ? 'active' : '' ?>" id="tabCmd" onclick="switchTab('cmd')">
                             <i class="fas fa-shopping-bag" style="font-size:11px;"></i> Commandes
                             <span class="notif-tab-count" id="tabCmdCount">0</span>
                         </button>
+                        <?php endif; ?>
+                        <?php if ($canSeeCand): ?>
+                        <button class="notif-tab <?= $firstTab === 'cand' ? 'active' : '' ?>" id="tabCand" onclick="switchTab('cand')">
+                            <i class="fas fa-user-tie" style="font-size:11px;"></i> Recrutements
+                            <span class="notif-tab-count" id="tabCandCount">0</span>
+                        </button>
+                        <?php endif; ?>
+                        <?php if ($canSeeStock): ?>
+                        <button class="notif-tab <?= $firstTab === 'stock' ? 'active' : '' ?>" id="tabStock" onclick="switchTab('stock')">
+                            <i class="fas fa-box-open" style="font-size:11px;"></i> Stock
+                            <span class="notif-tab-count" id="tabStockCount">0</span>
+                        </button>
+                        <?php endif; ?>
                     </div>
 
                     <div class="notif-list">
+                        <?php if ($canSeeMsg): ?>
                         <!-- Messages panel -->
-                        <div class="notif-panel active" id="panelMsg">
+                        <div class="notif-panel <?= $firstTab === 'msg' ? 'active' : '' ?>" id="panelMsg">
                             <div class="notif-empty" id="emptyMsg">
                                 <i class="fas fa-envelope-open-text"></i>
                                 <p>Aucun nouveau message</p>
                             </div>
                         </div>
-                        <!-- Candidatures panel -->
-                        <div class="notif-panel" id="panelCand">
-                            <div class="notif-empty" id="emptyCand">
-                                <i class="fas fa-user-check"></i>
-                                <p>Aucune nouvelle candidature</p>
-                            </div>
-                        </div>
+                        <?php endif; ?>
+                        <?php if ($canSeeCmd): ?>
                         <!-- Commandes panel -->
-                        <div class="notif-panel" id="panelCmd">
+                        <div class="notif-panel <?= $firstTab === 'cmd' ? 'active' : '' ?>" id="panelCmd">
                             <div class="notif-empty" id="emptyCmd">
                                 <i class="fas fa-shopping-bag"></i>
                                 <p>Aucune nouvelle commande</p>
                             </div>
                         </div>
+                        <?php endif; ?>
+                        <?php if ($canSeeCand): ?>
+                        <!-- Candidatures panel -->
+                        <div class="notif-panel <?= $firstTab === 'cand' ? 'active' : '' ?>" id="panelCand">
+                            <div class="notif-empty" id="emptyCand">
+                                <i class="fas fa-user-check"></i>
+                                <p>Aucune nouvelle candidature</p>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($canSeeStock): ?>
+                        <!-- Stock panel -->
+                        <div class="notif-panel <?= $firstTab === 'stock' ? 'active' : '' ?>" id="panelStock">
+                            <div class="notif-empty" id="emptyStock">
+                                <i class="fas fa-box-open"></i>
+                                <p>Aucune rupture de stock</p>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <div class="notif-footer">
+                        <?php if ($canSeeMsg): ?>
                         <a href="messages.php" class="notif-footer-btn secondary">
                             <i class="fas fa-envelope" style="font-size:11px;"></i> Messages
                         </a>
-                        <a href="voir_candidatures.php" class="notif-footer-btn secondary">
-                            <i class="fas fa-users" style="font-size:11px;"></i> Candidatures
-                        </a>
-                        <a href="admin_commandes.php" class="notif-footer-btn primary">
+                        <?php endif; ?>
+                        <?php if ($canSeeCmd): ?>
+                        <a href="admin_commandes.php" class="notif-footer-btn secondary">
                             <i class="fas fa-shopping-bag" style="font-size:11px;"></i> Commandes
                         </a>
+                        <?php endif; ?>
+                        <?php if ($canSeeCand): ?>
+                        <a href="voir_candidatures.php" class="notif-footer-btn <?= $canSeeMsg ? 'secondary' : 'primary' ?>">
+                            <i class="fas fa-users" style="font-size:11px;"></i> RH
+                        </a>
+                        <?php endif; ?>
+                        <?php if ($canSeeStock && $stockLinkable): ?>
+                        <a href="products_manager.php" class="notif-footer-btn primary">
+                            <i class="fas fa-box-open" style="font-size:11px;"></i> Stock
+                        </a>
+                        <?php elseif ($canSeeStock): ?>
+                        <span class="notif-footer-btn primary" style="opacity:.55;cursor:not-allowed;" title="Accès réservé à l'administrateur">
+                            <i class="fas fa-lock" style="font-size:11px;"></i> Stock
+                        </span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
 
-            <!-- Admin avatar -->
-            <div class="admin-avatar" title="Administrateur">A</div>
+            <?php if ($current_role === 'admin'): ?>
+            <!-- Bouton gestion utilisateurs (admin only) -->
+            <button class="btn-users" id="btnUsers" title="Gérer les utilisateurs" aria-label="Gérer les utilisateurs">
+                <i class="fas fa-users-cog"></i>
+            </button>
+            <?php endif; ?>
+
+            <!-- Compte utilisateur -->
+            <div class="account-wrap" id="accountWrap">
+                <button class="admin-avatar" id="accountBtn" aria-haspopup="true" aria-expanded="false" aria-label="Mon compte">
+                    <?= htmlspecialchars(mb_strtoupper(mb_substr($current_user, 0, 1, 'UTF-8'))) ?>
+                </button>
+
+                <div class="account-dropdown" id="accountDropdown" role="menu" aria-label="Menu du compte">
+                    <div class="account-head">
+                        <div class="account-head-avatar"><?= htmlspecialchars(mb_strtoupper(mb_substr($current_user, 0, 1, 'UTF-8'))) ?></div>
+                        <div class="account-head-info">
+                            <div class="account-head-name"><?= htmlspecialchars($current_user) ?></div>
+                            <div class="account-head-status"><span class="dot"></span><?= htmlspecialchars($currentRoleLabel) ?></div>
+                        </div>
+                    </div>
+                    <div class="account-menu">
+                        <?php if ($current_role === 'admin'): ?>
+                        <button class="account-menu-item" id="menuActivityLog">
+                            <i class="fas fa-clock-rotate-left"></i> Journal d'activité
+                        </button>
+                        <div class="account-menu-divider"></div>
+                        <?php endif; ?>
+                        <a href="logout.php" class="account-menu-item danger">
+                            <i class="fas fa-sign-out-alt"></i> Se déconnecter
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -1029,6 +1500,31 @@ body {
                 </div>
             </div>
         </div>
+
+        <?php if ($ruptureCount > 0 && $current_role === 'admin'): ?>
+        <!-- ALERTE RUPTURE DE STOCK — visible directement sur le dashboard -->
+        <div class="stock-alert">
+            <div class="stock-alert-icon"><i class="fas fa-triangle-exclamation"></i></div>
+            <div class="stock-alert-body">
+                <div class="stock-alert-title">
+                    <?= $ruptureCount ?> produit<?= $ruptureCount > 1 ? 's' : '' ?> en rupture de stock
+                </div>
+                <div class="stock-alert-list">
+                    <?php foreach (array_slice($ruptureProducts, 0, 6) as $p): ?>
+                    <span class="stock-alert-chip">
+                        <?= htmlspecialchars($p['nom']) ?><?= $p['format'] ? ' · '.htmlspecialchars($p['format']) : '' ?>
+                    </span>
+                    <?php endforeach; ?>
+                    <?php if ($ruptureCount > 6): ?>
+                    <span class="stock-alert-chip more">+<?= $ruptureCount - 6 ?> autre<?= ($ruptureCount-6) > 1 ? 's' : '' ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <a href="products_manager.php" class="stock-alert-action">
+                Réapprovisionner <i class="fas fa-arrow-right" style="font-size:.65rem;"></i>
+            </a>
+        </div>
+        <?php endif; ?>
 
         <!-- KPI Cards -->
         <div class="kpi-grid">
@@ -1062,7 +1558,11 @@ body {
             <div class="kpi-card amber">
                 <div class="kpi-top">
                     <div class="kpi-icon amber"><i class="fas fa-box-open"></i></div>
+                    <?php if ($ruptureCount > 0 && $current_role === 'admin'): ?>
+                    <div class="kpi-trend down"><i class="fas fa-triangle-exclamation" style="font-size:.6rem;"></i> <?= $ruptureCount ?> rupture<?= $ruptureCount > 1 ? 's' : '' ?></div>
+                    <?php else: ?>
                     <div class="kpi-trend neu"><i class="fas fa-minus" style="font-size:.6rem;"></i> Total</div>
+                    <?php endif; ?>
                 </div>
                 <div class="kpi-value" data-count="<?= $totalProduits ?>">0</div>
                 <div class="kpi-label">Produits actifs</div>
@@ -1072,7 +1572,8 @@ body {
         <!-- Charts + Activity -->
         <div class="section-grid">
 
-            <!-- Chart messages -->
+            <?php if ($canSeeMsg): ?>
+            <!-- Chart messages : admin + commercial -->
             <div class="card">
                 <div class="card-head">
                     <div>
@@ -1085,8 +1586,10 @@ body {
                     <canvas id="msgChart" height="180"></canvas>
                 </div>
             </div>
+            <?php endif; ?>
 
-            <!-- Donut candidatures -->
+            <?php if ($canSeeCand): ?>
+            <!-- Donut candidatures : admin + RH -->
             <div class="card">
                 <div class="card-head">
                     <div>
@@ -1095,11 +1598,13 @@ body {
                     </div>
                     <a href="voir_candidatures.php" class="card-action">Voir tout <i class="fas fa-arrow-right" style="font-size:.65rem;"></i></a>
                 </div>
-                <div class="card-body donut-body" style="display:flex;align-items:center;justify-content:center;gap:30px;">
+                <div class="card-body" style="display:flex;align-items:center;justify-content:center;gap:30px;">
                     <canvas id="candChart" width="160" height="160" style="max-width:160px;max-height:160px;"></canvas>
                     <div id="candLegend" style="font-size:.78rem;line-height:2;"></div>
                 </div>
             </div>
+            <?php endif; ?>
+
         </div>
 
         <!-- Recent activity -->
@@ -1117,19 +1622,8 @@ body {
                         <div class="notif-empty"><i class="fas fa-inbox"></i><p>Aucune activité récente</p></div>
                         <?php else: ?>
                         <?php foreach ($recentActivity as $act):
-                            $typeClass = match($act['type']) {
-                                'message'     => 'msg',
-                                'candidature' => 'cand',
-                                'commande'    => 'cmd',
-                                default       => 'msg'
-                            };
-                            $typeLabel = match($act['type']) {
-                                'message'     => '<i class="fas fa-envelope" style="font-size:.55rem;"></i> Message',
-                                'candidature' => '<i class="fas fa-user-tie" style="font-size:.55rem;"></i> Candidature',
-                                'commande'    => '<i class="fas fa-shopping-bag" style="font-size:.55rem;"></i> Commande',
-                                default       => ''
-                            };
-                            $initials = mb_strtoupper(mb_substr($act['nom'] ?: '?', 0, 1, 'UTF-8'));
+                            $isMsg = ($act['type'] === 'message');
+                            $initials = mb_strtoupper(mb_substr($act['nom'], 0, 1, 'UTF-8'));
                             $ts = strtotime($act['created_at']);
                             $diff = time() - $ts;
                             if ($diff < 60)       $ago = 'À l\'instant';
@@ -1138,9 +1632,11 @@ body {
                             else                   $ago = date('d/m/Y', $ts);
                         ?>
                         <div class="activity-item">
-                            <div class="activity-dot <?= $typeClass ?>"><?= $initials ?></div>
+                            <div class="activity-dot <?= $isMsg ? 'msg' : 'cand' ?>"><?= $initials ?></div>
                             <div class="activity-info">
-                                <span class="type-tag <?= $typeClass ?>"><?= $typeLabel ?></span>
+                                <span class="type-tag <?= $isMsg ? 'msg' : 'cand' ?>">
+                                    <?= $isMsg ? '<i class="fas fa-envelope" style="font-size:.55rem;"></i> Message' : '<i class="fas fa-user-tie" style="font-size:.55rem;"></i> Candidature' ?>
+                                </span>
                                 <div class="activity-name"><?= htmlspecialchars($act['nom']) ?></div>
                                 <div class="activity-detail"><?= htmlspecialchars(mb_strimwidth($act['detail'], 0, 60, '…', 'UTF-8')) ?></div>
                             </div>
@@ -1156,6 +1652,189 @@ body {
     </main>
 </div><!-- /.main -->
 </div><!-- /.layout -->
+
+<!-- ═══════════════════════════════════════════════
+     MODAL GESTION UTILISATEURS (admin only)
+═══════════════════════════════════════════════ -->
+<?php if ($current_role === 'admin'): ?>
+<div class="modal-bg" id="modalUsers" role="dialog" aria-modal="true" aria-label="Gestion des utilisateurs">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div class="modal-head-title">
+                <div class="modal-head-icon"><i class="fas fa-users-cog"></i></div>
+                Gestion des utilisateurs
+            </div>
+            <button class="modal-close" id="modalClose" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+
+            <!-- Alerte retour -->
+            <div class="modal-alert" id="modalAlert"></div>
+
+            <!-- Créer un compte -->
+            <div class="form-section">
+                <div class="form-section-title"><i class="fas fa-user-plus" style="margin-right:6px;"></i>Créer un nouveau compte</div>
+                <div class="form-row" style="margin-bottom:12px;">
+                    <div class="form-field">
+                        <label for="newUsername">Identifiant</label>
+                        <input type="text" id="newUsername" class="form-input" placeholder="ex: jean.dupont" autocomplete="off">
+                    </div>
+                    <div class="form-field">
+                        <label for="newPassword">Mot de passe</label>
+                        <div style="position:relative;">
+                            <input type="password" id="newPassword" class="form-input" placeholder="Min. 6 caractères" autocomplete="new-password">
+                            <button type="button" onclick="togglePwd()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#94a3b8;font-size:13px;" id="eyeBtn"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row" style="margin-bottom:16px;">
+                    <div class="form-field">
+                        <label for="newRole">Rôle</label>
+                        <select id="newRole" class="form-select">
+                            <option value="commercial">🛒 Commercial</option>
+                            <option value="rh">👥 Ressources Humaines</option>
+                        </select>
+                    </div>
+                    <div class="form-field" id="confirmField">
+                        <label for="confirmPassword">Confirmer le mot de passe</label>
+                        <input type="password" id="confirmPassword" class="form-input" placeholder="Répéter le mot de passe">
+                    </div>
+                </div>
+                <button class="btn-create" id="btnCreate" onclick="createUser()">
+                    <i class="fas fa-plus-circle"></i> Créer le compte
+                </button>
+            </div>
+
+            <!-- Liste des comptes existants -->
+            <div class="users-section">
+                <div class="users-section-title"><i class="fas fa-list" style="margin-right:6px;"></i>Comptes existants</div>
+                <div class="user-list" id="userList">
+                    <div class="user-list-empty"><i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Chargement…</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+
+<!-- ═══════════════════════════════════════════════
+     MODAL CHANGEMENT MOT DE PASSE (admin only)
+═══════════════════════════════════════════════ -->
+<?php if ($current_role === 'admin'): ?>
+<div class="pwd-modal-bg" id="pwdModal" role="dialog" aria-modal="true" aria-label="Changer le mot de passe">
+    <div class="pwd-modal-box">
+
+        <div class="pwd-modal-head">
+            <div class="pwd-modal-head-left">
+                <div class="pwd-modal-icon"><i class="fas fa-key"></i></div>
+                <div>
+                    <div class="pwd-modal-title">Modifier le mot de passe</div>
+                    <div class="pwd-modal-sub">Réinitialisation sécurisée d'un compte</div>
+                </div>
+            </div>
+            <button class="pwd-modal-close" id="pwdModalClose" aria-label="Fermer">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="pwd-modal-body">
+
+            <!-- Alerte -->
+            <div class="pwd-alert" id="pwdAlert"></div>
+
+            <!-- Sélecteur utilisateur -->
+            <div class="pwd-user-select-wrap">
+                <i class="fas fa-user"></i>
+                <select class="pwd-user-select" id="pwdUserId">
+                    <option value="">— Choisir un compte —</option>
+                </select>
+            </div>
+
+            <hr class="pwd-divider">
+
+            <!-- Champs mot de passe -->
+            <div class="pwd-fields">
+                <div class="pwd-field">
+                    <label class="pwd-field-label">Nouveau mot de passe</label>
+                    <div class="pwd-field-wrap">
+                        <input type="password" class="pwd-field-input" id="pwdNew"
+                               placeholder="Min. 8 caractères recommandés"
+                               autocomplete="new-password"
+                               oninput="pwdStrength(this.value)">
+                        <button type="button" class="pwd-eye-btn" onclick="togglePwdField('pwdNew',this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <!-- Barre de force -->
+                    <div class="pwd-strength">
+                        <div class="pwd-strength-bar"><div class="pwd-strength-fill" id="strengthFill"></div></div>
+                        <div class="pwd-strength-text" id="strengthText">Entrez un mot de passe</div>
+                    </div>
+                </div>
+
+                <div class="pwd-field">
+                    <label class="pwd-field-label">Confirmer le mot de passe</label>
+                    <div class="pwd-field-wrap">
+                        <input type="password" class="pwd-field-input" id="pwdConfirm"
+                               placeholder="Répéter le mot de passe"
+                               autocomplete="new-password">
+                        <button type="button" class="pwd-eye-btn" onclick="togglePwdField('pwdConfirm',this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bouton submit -->
+            <button class="pwd-submit" id="pwdSubmitBtn" onclick="submitPwdChange()">
+                <i class="fas fa-shield-halved"></i>
+                Enregistrer le nouveau mot de passe
+            </button>
+
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL JOURNAL D'ACTIVITÉ (admin only)
+═══════════════════════════════════════════════ -->
+<?php if ($current_role === 'admin'): ?>
+<div class="modal-bg" id="modalLog" role="dialog" aria-modal="true" aria-label="Journal d'activité">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div class="modal-head-title">
+                <div class="modal-head-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                Journal d'activité
+            </div>
+            <button class="modal-close" id="modalLogClose" aria-label="Fermer"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+
+            <div class="log-warn-banner" id="logWarnBanner" style="display:none;">
+                <i class="fas fa-triangle-exclamation"></i>
+                <div>
+                    Cette fonctionnalité nécessite la table <code>activity_log</code>.
+                    Exécutez <code>activity_log_migration.sql</code> dans phpMyAdmin, puis rouvrez ce journal.
+                </div>
+            </div>
+
+            <div class="log-filters">
+                <button class="log-filter-btn active" data-filter="all" onclick="loadActivityLog('all')">Tout</button>
+                <button class="log-filter-btn" data-filter="commandes" onclick="loadActivityLog('commandes')">Commandes</button>
+                <button class="log-filter-btn" data-filter="candidatures" onclick="loadActivityLog('candidatures')">Candidatures</button>
+            </div>
+
+            <div class="log-list" id="logList">
+                <div class="log-list-empty"><i class="fas fa-spinner fa-spin"></i>Chargement…</div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ═══════════════════════════════════════════════
      JAVASCRIPT
@@ -1271,19 +1950,7 @@ if (document.getElementById('candChart')) {
 }
 
 // ══════════════════════════════════════════════
-//  HAMBURGER SIDEBAR (mobile)
-// ══════════════════════════════════════════════
-(function() {
-    const btn     = document.getElementById('admin-menu-btn');
-    const sidebar = document.getElementById('sidebar');
-    const overlay = document.getElementById('side-overlay');
-    if (!btn) return;
-    function openSidebar()  { sidebar.classList.add('open'); overlay.classList.add('active'); btn.classList.add('open'); btn.setAttribute('aria-expanded','true'); document.body.style.overflow='hidden'; }
-    function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('active'); btn.classList.remove('open'); btn.setAttribute('aria-expanded','false'); document.body.style.overflow=''; }
-    btn.addEventListener('click', e => { e.stopPropagation(); sidebar.classList.contains('open') ? closeSidebar() : openSidebar(); });
-    overlay.addEventListener('click', closeSidebar);
-    sidebar.querySelectorAll('a').forEach(l => l.addEventListener('click', () => { if(window.innerWidth < 1024) closeSidebar(); }));
-})();
+
 
 // ══════════════════════════════════════════════
 //  NOTIFICATION SYSTEM
@@ -1293,9 +1960,8 @@ const notifDropdown = document.getElementById('notifDropdown');
 const notifBadge    = document.getElementById('notifBadge');
 const markAllBtn    = document.getElementById('markAllRead');
 
-let currentTab = 'msg';
-let notifData  = { messages: [], candidatures: [], commandes: [] };
-let notifFetchFailed = false;
+let currentTab = '<?= $firstTab ?>';
+let notifData  = { messages: [], candidatures: [], stock: [], commandes: [] };
 
 // Toggle dropdown
 notifBtn.addEventListener('click', e => {
@@ -1323,39 +1989,30 @@ function closeNotif() {
     notifBtn.setAttribute('aria-expanded', 'false');
 }
 
-// Tab switching
+// Tab switching (défensif : certains onglets n'existent pas selon le rôle connecté)
 function switchTab(tab) {
     currentTab = tab;
-    document.getElementById('tabMsg').classList.toggle('active', tab === 'msg');
-    document.getElementById('tabCand').classList.toggle('active', tab === 'cand');
-    document.getElementById('tabCmd').classList.toggle('active', tab === 'cmd');
-    document.getElementById('panelMsg').classList.toggle('active', tab === 'msg');
-    document.getElementById('panelCand').classList.toggle('active', tab === 'cand');
-    document.getElementById('panelCmd').classList.toggle('active', tab === 'cmd');
+    ['tabMsg','tabCmd','tabCand','tabStock'].forEach(id => {
+        const map = { tabMsg: 'msg', tabCmd: 'cmd', tabCand: 'cand', tabStock: 'stock' };
+        document.getElementById(id)?.classList.toggle('active', tab === map[id]);
+    });
+    ['panelMsg','panelCmd','panelCand','panelStock'].forEach(id => {
+        const map = { panelMsg: 'msg', panelCmd: 'cmd', panelCand: 'cand', panelStock: 'stock' };
+        document.getElementById(id)?.classList.toggle('active', tab === map[id]);
+    });
 }
 window.switchTab = switchTab;
 
-// Mark all read
+// Mark all read — note : la rupture de stock est un statut LIVE,
+// elle n'est jamais "marquée lue" : elle disparaît seulement quand le produit est réapprovisionné.
 markAllBtn.addEventListener('click', async () => {
-    try {
-        const res  = await fetch('?api=mark_read&type=all&_=' + Date.now());
-        const data = await res.json();
-        if (!data || data.success !== true) {
-            console.error('mark_read a échoué :', data);
-        }
-    } catch (err) {
-        console.error('Erreur réseau lors du mark_read :', err);
-    }
-    notifData = { messages: [], candidatures: [], commandes: [] };
+    await fetch('?api=mark_read');
+    notifData.messages     = [];
+    notifData.candidatures = [];
+    notifData.commandes    = [];
     renderNotifications();
-    updateBadge(0);
-    notifBtn.classList.remove('has-new');
-
-    const sbMsg  = document.getElementById('sidebar-msg-badge');
-    const sbCand = document.getElementById('sidebar-cand-badge');
-    const sbCmd  = document.getElementById('sidebar-cmd-badge');
-    [sbMsg, sbCand, sbCmd].forEach(el => { if (el) el.style.display = 'none'; });
-
+    updateBadge(notifData.stock.length);
+    if (notifData.stock.length === 0) notifBtn.classList.remove('has-new');
     markAllBtn.innerHTML = '<i class="fas fa-check" style="margin-right:4px;"></i> Lu';
     setTimeout(() => { markAllBtn.innerHTML = '<i class="fas fa-check-double" style="margin-right:4px;"></i> Tout marquer lu'; }, 2000);
 });
@@ -1363,50 +2020,26 @@ markAllBtn.addEventListener('click', async () => {
 // Fetch from API
 async function fetchNotifications() {
     try {
-        const res = await fetch('?api=notifications&_=' + Date.now());
-
-        if (!res.ok) {
-            throw new Error('Réponse HTTP ' + res.status + ' depuis l\'API notifications');
-        }
-
-        const raw = await res.text();
-        let data;
-        try {
-            data = JSON.parse(raw);
-        } catch (parseErr) {
-            // La réponse n'est pas du JSON valide : probablement une erreur PHP
-            // affichée avant le JSON. On le signale clairement en console pour
-            // pouvoir corriger côté serveur, plutôt que d'échouer en silence.
-            console.error('Réponse API notifications invalide (pas du JSON) :', raw.slice(0, 300));
-            notifFetchFailed = true;
-            return;
-        }
-
-        if (data.success === false) {
-            console.error('Erreur API notifications :', data.error || data);
-            notifFetchFailed = true;
-            return;
-        }
-
-        notifFetchFailed = false;
-        notifData = {
-            messages:     data.messages     || [],
-            candidatures: data.candidatures || [],
-            commandes:    data.commandes    || []
-        };
+        const res  = await fetch('?api=notifications&_=' + Date.now());
+        const data = await res.json();
+        notifData  = data;
         renderNotifications();
         updateBadge(data.total || 0);
 
         // Update sidebar badges
-        const sbMsg  = document.getElementById('sidebar-msg-badge');
-        const sbCand = document.getElementById('sidebar-cand-badge');
-        const sbCmd  = document.getElementById('sidebar-cmd-badge');
-        const mc = notifData.messages.length;
-        const cc = notifData.candidatures.length;
-        const oc = notifData.commandes.length;
-        if (sbMsg)  { sbMsg.textContent  = mc; sbMsg.style.display  = mc ? 'inline-flex' : 'none'; }
-        if (sbCand) { sbCand.textContent = cc; sbCand.style.display = cc ? 'inline-flex' : 'none'; }
-        if (sbCmd)  { sbCmd.textContent  = oc; sbCmd.style.display  = oc ? 'inline-flex' : 'none'; }
+        const sbMsg   = document.getElementById('sidebar-msg-badge');
+        const sbCmd   = document.getElementById('sidebar-cmd-badge');
+        const sbCand  = document.getElementById('sidebar-cand-badge');
+        const sbStock = document.getElementById('sidebar-stock-badge');
+        const mc  = data.messages.length;
+        const cmc = (data.commandes || []).length;
+        const cc  = data.candidatures.length;
+        const sc  = (data.stock || []).length;
+        if (sbMsg)   { sbMsg.textContent   = mc;  sbMsg.style.display   = mc  ? 'inline-flex' : 'none'; }
+        if (sbCmd)   { sbCmd.textContent   = cmc; sbCmd.style.display   = cmc ? 'inline-flex' : 'none'; }
+        if (sbCand)  { sbCand.textContent  = cc;  sbCand.style.display  = cc  ? 'inline-flex' : 'none'; }
+        if (sbStock) { sbStock.textContent = sc;  sbStock.style.display = sc  ? 'inline-flex' : 'none'; }
+
 
         // Bell animation on new notifications
         if (data.total > 0) {
@@ -1415,10 +2048,7 @@ async function fetchNotifications() {
         } else {
             notifBtn.classList.remove('has-new');
         }
-    } catch (err) {
-        notifFetchFailed = true;
-        console.error('Notif fetch error:', err);
-    }
+    } catch(err) { console.warn('Notif fetch error:', err); }
 }
 
 function updateBadge(n) {
@@ -1433,7 +2063,7 @@ function updateBadge(n) {
 }
 
 function timeAgo(dateStr) {
-    const d    = new Date((dateStr || '').replace(' ', 'T'));
+    const d    = new Date(dateStr);
     const diff = Math.floor((Date.now() - d) / 1000);
     if (diff < 60)    return 'À l\'instant';
     if (diff < 3600)  return `${Math.floor(diff/60)} min`;
@@ -1446,16 +2076,19 @@ function initials(name) {
 }
 
 function renderNotifications() {
-    const msgs  = notifData.messages     || [];
+    const msgs  = notifData.messages    || [];
     const cands = notifData.candidatures || [];
+    const stock = notifData.stock        || [];
     const cmds  = notifData.commandes    || [];
 
-    document.getElementById('tabMsgCount').textContent  = msgs.length;
-    document.getElementById('tabCandCount').textContent = cands.length;
-    document.getElementById('tabCmdCount').textContent  = cmds.length;
+    document.getElementById('tabMsgCount')?.replaceChildren(document.createTextNode(msgs.length));
+    document.getElementById('tabCmdCount')?.replaceChildren(document.createTextNode(cmds.length));
+    document.getElementById('tabCandCount')?.replaceChildren(document.createTextNode(cands.length));
+    document.getElementById('tabStockCount')?.replaceChildren(document.createTextNode(stock.length));
 
     // Messages panel
     const panelMsg = document.getElementById('panelMsg');
+    if (panelMsg) {
     if (msgs.length === 0) {
         panelMsg.innerHTML = `<div class="notif-empty"><i class="fas fa-envelope-open-text"></i><p>Aucun nouveau message</p></div>`;
     } else {
@@ -1470,9 +2103,30 @@ function renderNotifications() {
             </div>
         `).join('');
     }
+    }
+
+    // Commandes panel — lien actif (le commercial a accès à admin_commandes.php)
+    const panelCmd = document.getElementById('panelCmd');
+    if (panelCmd) {
+    if (cmds.length === 0) {
+        panelCmd.innerHTML = `<div class="notif-empty"><i class="fas fa-shopping-bag"></i><p>Aucune nouvelle commande</p></div>`;
+    } else {
+        panelCmd.innerHTML = cmds.map(c => `
+            <div class="notif-item new" onclick="window.location='admin_commandes.php'">
+                <div class="notif-avatar cmd">${initials(((c.nom||'')+' '+(c.prenom||'')).trim())}</div>
+                <div class="notif-item-body">
+                    <div class="notif-item-name">${escHtml(((c.nom||'')+' '+(c.prenom||'')).trim() || 'Client')}</div>
+                    <div class="notif-item-detail"><i class="fas fa-store" style="font-size:.65rem;margin-right:3px;color:#16a34a;"></i>${escHtml(c.nom_marche || c.region || 'Nouvelle commande')}</div>
+                    <div class="notif-item-time"><i class="fas fa-clock" style="font-size:.6rem;margin-right:3px;"></i>${timeAgo(c.date_commande)}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    }
 
     // Candidatures panel
     const panelCand = document.getElementById('panelCand');
+    if (panelCand) {
     if (cands.length === 0) {
         panelCand.innerHTML = `<div class="notif-empty"><i class="fas fa-user-check"></i><p>Aucune nouvelle candidature</p></div>`;
     } else {
@@ -1487,25 +2141,33 @@ function renderNotifications() {
             </div>
         `).join('');
     }
+    }
 
-    // Commandes panel
-    const panelCmd = document.getElementById('panelCmd');
-    if (cmds.length === 0) {
-        panelCmd.innerHTML = `<div class="notif-empty"><i class="fas fa-shopping-bag"></i><p>Aucune nouvelle commande</p></div>`;
+    // Stock panel — rupture de stock (statut LIVE, pas de "lu/non lu")
+    const panelStock = document.getElementById('panelStock');
+    if (panelStock) {
+    if (stock.length === 0) {
+        panelStock.innerHTML = `<div class="notif-empty"><i class="fas fa-box-open"></i><p>Aucune rupture de stock</p></div>`;
     } else {
-        panelCmd.innerHTML = cmds.map(c => {
-            const nomClient = ((c.nom || '') + ' ' + (c.prenom || '')).trim() || 'Client';
-            const marche    = [c.nom_marche, c.region].filter(Boolean).join(' · ');
-            return `
-            <div class="notif-item new" onclick="window.location='admin_commandes.php'">
-                <div class="notif-avatar cmd">${initials(nomClient)}</div>
+        panelStock.innerHTML = stock.map(p => {
+            const tag    = stockLinkable ? 'a' : 'div';
+            const href   = stockLinkable ? `href="products_manager.php?id=${p.id}"` : '';
+            const cursor = stockLinkable ? '' : 'style="cursor:default;"';
+            const lock   = !stockLinkable ? `<span style="font-size:.6rem;padding:1px 6px;background:#fee2e2;color:#dc2626;border-radius:5px;font-weight:700;margin-left:5px;"><i class='fas fa-lock'></i> Admin</span>` : '';
+            return `<${tag} ${href} ${cursor} class="notif-item new" style="text-decoration:none;">
+                <div class="notif-avatar stock"><i class="fas fa-triangle-exclamation"></i></div>
                 <div class="notif-item-body">
-                    <div class="notif-item-name">${escHtml(nomClient)}</div>
-                    <div class="notif-item-detail"><i class="fas fa-store" style="font-size:.65rem;margin-right:3px;color:#f59e0b;"></i>${escHtml(marche || 'Nouvelle commande')}</div>
-                    <div class="notif-item-time"><i class="fas fa-clock" style="font-size:.6rem;margin-right:3px;"></i>${timeAgo(c.date_commande)}</div>
+                    <div class="notif-item-name">${escHtml(p.nom)} ${lock}</div>
+                    <div class="notif-item-detail"><i class="fas fa-box" style="font-size:.65rem;margin-right:3px;color:#f59e0b;"></i>${escHtml(p.format || '')} — en rupture</div>
+                    <div class="notif-item-time"><i class="fas fa-circle" style="font-size:.5rem;margin-right:3px;color:#ef4444;"></i>Stock : 0 unité</div>
                 </div>
-            </div>`;
+            </${tag}>`;
         }).join('');
+        if (!stockLinkable) {
+            panelStock.innerHTML += `<div style="padding:8px 14px;font-size:.7rem;color:#92400e;font-weight:700;text-align:center;background:#fffbeb;border-top:1px solid #fef3c7;">
+                <i class="fas fa-lock" style="margin-right:5px;"></i>Contactez l'administrateur pour gérer le stock</div>`;
+        }
+    }
     }
 }
 
@@ -1513,9 +2175,11 @@ function escHtml(str) {
     return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// Initial fetch + polling every 20s
+const stockLinkable = <?= ($current_role === 'admin') ? 'true' : 'false' ?>;
+
+// Initial fetch + polling every 30s
 fetchNotifications();
-setInterval(fetchNotifications, 20000);
+setInterval(fetchNotifications, 15000); // toutes les 15s
 
 // ══════════════════════════════════════════════
 //  GLOBAL SEARCH (quick redirect)
@@ -1526,6 +2190,385 @@ document.getElementById('global-search').addEventListener('keydown', e => {
         if (q) window.location.href = 'messages.php?q=' + encodeURIComponent(q);
     }
 });
+
+// ══════════════════════════════════════════════
+//  MODAL GESTION UTILISATEURS
+// ══════════════════════════════════════════════
+(function() {
+    const btnUsers  = document.getElementById('btnUsers');
+    const modal     = document.getElementById('modalUsers');
+    const btnClose  = document.getElementById('modalClose');
+    if (!btnUsers || !modal) return;
+
+    function openModal()  {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        loadUsers();
+    }
+    function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+        clearAlert();
+    }
+
+    btnUsers.addEventListener('click', openModal);
+    btnClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    // Afficher/masquer mdp
+    window.togglePwd = function() {
+        const inp = document.getElementById('newPassword');
+        const ico = document.getElementById('eyeBtn').querySelector('i');
+        if (inp.type === 'password') { inp.type = 'text'; ico.className = 'fas fa-eye-slash'; }
+        else { inp.type = 'password'; ico.className = 'fas fa-eye'; }
+    };
+
+    function showAlert(msg, type) {
+        const el = document.getElementById('modalAlert');
+        el.className = 'modal-alert ' + type;
+        el.innerHTML = `<i class="fas fa-${type==='ok'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
+        el.style.display = 'flex';
+        if (type === 'ok') setTimeout(() => el.style.display = 'none', 3500);
+    }
+    function clearAlert() {
+        const el = document.getElementById('modalAlert');
+        if (el) el.style.display = 'none';
+    }
+
+    // Charger la liste des utilisateurs
+    async function loadUsers() {
+        const list = document.getElementById('userList');
+        list.innerHTML = '<div class="user-list-empty"><i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Chargement…</div>';
+        try {
+            const res  = await fetch('?api=get_users');
+            const data = await res.json();
+            if (data.ok === false) {
+                list.innerHTML = `<div class="user-list-empty" style="color:#dc2626;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>${escHtml(data.msg || 'Erreur de chargement.')}</div>`;
+                return;
+            }
+            const users = (data.users || []).filter(u => u.role !== 'admin');
+            if (!users.length) {
+                list.innerHTML = '<div class="user-list-empty"><i class="fas fa-users" style="margin-right:6px;opacity:.4;"></i>Aucun compte commercial ou RH créé.</div>';
+                return;
+            }
+            const roleLabel = { commercial: '🛒 Commercial', rh: '👥 RH' };
+            list.innerHTML = users.map(u => `
+                <div class="user-card" id="uc-${u.id}">
+                    <div class="user-card-avatar ${u.role}">${(u.username||'?')[0].toUpperCase()}</div>
+                    <div class="user-card-info">
+                        <div class="user-card-name">${escHtml(u.username)}</div>
+                        <div class="user-card-role">${roleLabel[u.role] || u.role}</div>
+                    </div>
+                    <span class="role-chip ${u.role}">${u.role.toUpperCase()}</span>
+                    <button class="btn-del-user" style="background:#f0fdf4;border-color:#bbf7d0;color:#16a34a;margin-right:4px;" onclick="openPwdModal(${u.id},'${escHtml(u.username)}')" title="Changer le mot de passe">
+                        <i class="fas fa-key"></i>
+                    </button>
+                    <button class="btn-del-user" onclick="deleteUser(${u.id},'${escHtml(u.username)}')" title="Supprimer">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `).join('');
+        } catch(e) {
+            list.innerHTML = '<div class="user-list-empty" style="color:#dc2626;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Erreur de chargement (réponse invalide du serveur).</div>';
+        }
+    }
+
+    // Créer un utilisateur
+    window.createUser = async function() {
+        clearAlert();
+        const username = document.getElementById('newUsername').value.trim();
+        const password = document.getElementById('newPassword').value.trim();
+        const confirm  = document.getElementById('confirmPassword').value.trim();
+        const role     = document.getElementById('newRole').value;
+        const btn      = document.getElementById('btnCreate');
+
+        if (!username || !password) { showAlert('Remplissez tous les champs.', 'err'); return; }
+        if (password !== confirm)   { showAlert('Les mots de passe ne correspondent pas.', 'err'); return; }
+        if (password.length < 6)   { showAlert('Mot de passe trop court (min. 6 caractères).', 'err'); return; }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Création…';
+        try {
+            const res  = await fetch('?api=create_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, role })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                showAlert(data.msg, 'ok');
+                document.getElementById('newUsername').value  = '';
+                document.getElementById('newPassword').value  = '';
+                document.getElementById('confirmPassword').value = '';
+                loadUsers();
+            } else {
+                showAlert(data.msg, 'err');
+            }
+        } catch(e) {
+            showAlert('Erreur réseau.', 'err');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-plus-circle"></i> Créer le compte';
+        }
+    };
+
+    // Supprimer un utilisateur
+    window.deleteUser = async function(id, name) {
+        if (!confirm(`Supprimer le compte "${name}" ? Cette action est irréversible.`)) return;
+        try {
+            const res  = await fetch('?api=delete_user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                showAlert(data.msg, 'ok');
+                const card = document.getElementById('uc-' + id);
+                if (card) { card.style.opacity = '0'; card.style.transform = 'scale(.95)'; card.style.transition = 'all .3s'; setTimeout(() => card.remove(), 300); }
+            } else {
+                showAlert(data.msg, 'err');
+            }
+        } catch(e) {
+            showAlert('Erreur réseau.', 'err');
+        }
+    };
+
+    function escHtml(s) {
+        return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
+
+
+// ══════════════════════════════════════════════
+//  MODAL CHANGER MOT DE PASSE
+// ══════════════════════════════════════════════
+(function() {
+    const modal   = document.getElementById('pwdModal');
+    const btnClose = document.getElementById('pwdModalClose');
+    if (!modal) return;
+
+    function openModal() { modal.classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function closeModal() { modal.classList.remove('open'); document.body.style.overflow = ''; resetPwdForm(); }
+
+    btnClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.classList.contains('open')) closeModal(); });
+
+    function resetPwdForm() {
+        document.getElementById('pwdNew').value = '';
+        document.getElementById('pwdConfirm').value = '';
+        document.getElementById('pwdNew').className = 'pwd-field-input';
+        document.getElementById('pwdConfirm').className = 'pwd-field-input';
+        document.getElementById('strengthFill').style.width = '0';
+        document.getElementById('strengthText').textContent = 'Entrez un mot de passe';
+        document.getElementById('strengthFill').style.background = '#e2e8f0';
+        hidePwdAlert();
+    }
+
+    function showPwdAlert(msg, type) {
+        const el = document.getElementById('pwdAlert');
+        el.className = 'pwd-alert ' + type;
+        el.innerHTML = `<i class="fas fa-${type==='ok'?'check-circle':'exclamation-circle'}"></i> ${msg}`;
+        if (type === 'ok') setTimeout(() => { el.className = 'pwd-alert'; closeModal(); }, 2200);
+    }
+    function hidePwdAlert() {
+        const el = document.getElementById('pwdAlert');
+        if (el) el.className = 'pwd-alert';
+    }
+
+    // Charger les utilisateurs dans le sélecteur
+    async function loadPwdUsers() {
+        try {
+            const res   = await fetch('?api=get_users');
+            const data  = await res.json();
+            const sel   = document.getElementById('pwdUserId');
+            const users = (data.users || []).filter(u => u.role !== 'admin');
+            sel.innerHTML = '<option value="">— Choisir un compte —</option>';
+            users.forEach(u => {
+                const o = document.createElement('option');
+                o.value = u.id;
+                o.textContent = u.username + ' (' + (u.role === 'commercial' ? '🛒 Commercial' : '👥 RH') + ')';
+                sel.appendChild(o);
+            });
+        } catch(e) { /* silencieux */ }
+    }
+
+    window.openPwdModal = function(userId, username) {
+        openModal();
+        loadPwdUsers().then(() => {
+            if (userId) document.getElementById('pwdUserId').value = userId;
+        });
+    };
+
+    window.togglePwdField = function(fieldId, btn) {
+        const inp = document.getElementById(fieldId);
+        const ico = btn.querySelector('i');
+        if (inp.type === 'password') { inp.type = 'text'; ico.className = 'fas fa-eye-slash'; }
+        else { inp.type = 'password'; ico.className = 'fas fa-eye'; }
+    };
+
+    window.pwdStrength = function(val) {
+        const fill = document.getElementById('strengthFill');
+        const text = document.getElementById('strengthText');
+        if (!val) { fill.style.width='0'; text.textContent='Entrez un mot de passe'; fill.style.background='#e2e8f0'; return; }
+        let score = 0;
+        if (val.length >= 8)  score++;
+        if (val.length >= 12) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+        const levels = [
+            { pct:'20%', color:'#ef4444', label:'Très faible' },
+            { pct:'40%', color:'#f97316', label:'Faible' },
+            { pct:'60%', color:'#eab308', label:'Moyen' },
+            { pct:'80%', color:'#22c55e', label:'Fort' },
+            { pct:'100%',color:'#16a34a', label:'Très fort ✓' },
+        ];
+        const l = levels[Math.max(0, score-1)];
+        fill.style.width      = l.pct;
+        fill.style.background = l.color;
+        text.style.color      = l.color;
+        text.textContent      = l.label;
+    };
+
+    window.submitPwdChange = async function() {
+        hidePwdAlert();
+        const userId  = document.getElementById('pwdUserId').value;
+        const newPwd  = document.getElementById('pwdNew').value.trim();
+        const confirm = document.getElementById('pwdConfirm').value.trim();
+        const btn     = document.getElementById('pwdSubmitBtn');
+
+        // Validation
+        if (!userId)          { showPwdAlert('Sélectionnez un utilisateur.', 'err'); return; }
+        if (!newPwd)          { showPwdAlert('Entrez un nouveau mot de passe.', 'err'); return; }
+        if (newPwd.length < 6){ showPwdAlert('Mot de passe trop court (minimum 6 caractères).', 'err'); return; }
+        if (newPwd !== confirm){ showPwdAlert('Les mots de passe ne correspondent pas.', 'err');
+            document.getElementById('pwdConfirm').className = 'pwd-field-input err'; return; }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement…';
+        try {
+            const res  = await fetch('?api=change_password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: parseInt(userId), password: newPwd })
+            });
+            const data = await res.json();
+            if (data.ok) { showPwdAlert(data.msg || 'Mot de passe mis à jour avec succès.', 'ok'); }
+            else          { showPwdAlert(data.msg || 'Erreur lors de la mise à jour.', 'err'); }
+        } catch(e) {
+            showPwdAlert('Erreur réseau. Réessayez.', 'err');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-shield-halved"></i> Enregistrer le nouveau mot de passe';
+        }
+    };
+})();
+
+// ══════════════════════════════════════════════
+//  MENU COMPTE (dropdown avatar)
+// ══════════════════════════════════════════════
+(function() {
+    const btn      = document.getElementById('accountBtn');
+    const dropdown = document.getElementById('accountDropdown');
+    if (!btn || !dropdown) return;
+
+    function openDD()  { dropdown.classList.add('open');  btn.setAttribute('aria-expanded','true'); }
+    function closeDD() { dropdown.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        dropdown.classList.contains('open') ? closeDD() : openDD();
+    });
+    document.addEventListener('click', e => {
+        if (!dropdown.contains(e.target) && e.target !== btn) closeDD();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDD(); });
+
+    const menuLog = document.getElementById('menuActivityLog');
+    if (menuLog) {
+        menuLog.addEventListener('click', () => {
+            closeDD();
+            window.openActivityLogModal();
+        });
+    }
+})();
+
+// ══════════════════════════════════════════════
+//  MODAL JOURNAL D'ACTIVITÉ
+// ══════════════════════════════════════════════
+(function() {
+    const modal    = document.getElementById('modalLog');
+    const btnClose = document.getElementById('modalLogClose');
+    if (!modal) { window.openActivityLogModal = function(){}; return; }
+
+    function openModal() {
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        loadActivityLog('all');
+    }
+    function closeModal() {
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+    window.openActivityLogModal = openModal;
+
+    btnClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    const icons  = { commandes: 'fa-shopping-bag', candidatures: 'fa-user-tie' };
+    const labels = {
+        modification_statut: 'a modifié le statut',
+        suppression:         'a supprimé',
+        creation:             'a créé',
+    };
+    const roleLabel = { admin: 'Admin', rh: 'RH', commercial: 'Commercial' };
+
+    window.loadActivityLog = async function(filter) {
+        document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+        const list = document.getElementById('logList');
+        const warn = document.getElementById('logWarnBanner');
+        list.innerHTML = '<div class="log-list-empty"><i class="fas fa-spinner fa-spin"></i>Chargement…</div>';
+        try {
+            const res  = await fetch('?api=get_activity_log&filter=' + filter);
+            const data = await res.json();
+
+            if (data.error === 'table_missing') {
+                warn.style.display = 'flex';
+                list.innerHTML = '';
+                return;
+            }
+            warn.style.display = 'none';
+
+            const logs = data.logs || [];
+            if (!logs.length) {
+                list.innerHTML = '<div class="log-list-empty"><i class="fas fa-clipboard-list"></i>Aucune activité enregistrée pour l\'instant.</div>';
+                return;
+            }
+            list.innerHTML = logs.map(l => `
+                <div class="log-item">
+                    <div class="log-icon ${l.table_concernee}"><i class="fas ${icons[l.table_concernee] || 'fa-circle-info'}"></i></div>
+                    <div class="log-body">
+                        <div class="log-top-row">
+                            <span class="log-user">${escHtml(l.username)} <span class="role-chip ${l.role}" style="margin-left:5px;">${roleLabel[l.role] || l.role}</span></span>
+                            <span class="log-time">${timeAgo(l.created_at)}</span>
+                        </div>
+                        <div class="log-details">${labels[l.action] || escHtml(l.action)} — ${escHtml(l.details || ('#' + l.record_id))}</div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            list.innerHTML = '<div class="log-list-empty" style="color:#dc2626;"><i class="fas fa-exclamation-triangle"></i>Erreur de chargement.</div>';
+        }
+    };
+
+    function escHtml(s) {
+        return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
 </script>
 </body>
 </html>
