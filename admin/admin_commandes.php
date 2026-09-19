@@ -88,7 +88,7 @@ $regions        = $pdo->query("SELECT DISTINCT region FROM commandes ORDER BY re
 }
 
 /* Cacher le span de statut sur écran */
-.statut-print { display: none; }
+.action-print { display: none; }
 
 /* ══════════════════════════════════════════
    IMPRESSION — PROFESSIONNELLE 2026
@@ -110,7 +110,7 @@ $regions        = $pdo->query("SELECT DISTINCT region FROM commandes ORDER BY re
     table { width: 100% !important; border-collapse: collapse !important; margin-top: 0 !important; font-size: 10px !important; }
     thead tr { background: #16a34a !important; color: #fff !important; }
     thead th {
-        padding: 9px 10px !important; font-weight: 800 !important;
+        padding: 6px 45px !important; font-weight: 800 !important;
         font-size: 9px !important; text-transform: uppercase;
         letter-spacing: 0.06em; border: none !important; color: #fff !important;
     }
@@ -278,9 +278,9 @@ $regions        = $pdo->query("SELECT DISTINCT region FROM commandes ORDER BY re
                                 <?php endif; ?>
                             </div>
                         </td>
-                        <td class="p-4 md:p-5 text-center no-print" data-label="Actions">
+                        <td class="p-4 md:p-5 text-center" data-label="Actions">
                             <button onclick="supprimerLigne(<?= (int)$c['id'] ?>)"
-                                    class="group flex items-center justify-center w-9 h-9 rounded-full bg-red-50 hover:bg-red-600 transition-all mx-auto">
+                                    class="group flex items-center justify-center w-9 h-9 rounded-full bg-red-50 hover:bg-red-600 transition-all mx-auto no-print">
                                 <i class="fas fa-trash-alt text-red-400 group-hover:text-white transition-colors"></i>
                             </button>
                         </td>
@@ -299,12 +299,10 @@ $regions        = $pdo->query("SELECT DISTINCT region FROM commandes ORDER BY re
 
     </div>
 </main>
-</div><!-- /.main -->
-
+</div>
 <script>
-const commandesData = <?= json_encode($allCommandes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS) ?>;
-</script>
-
+     const commandesData = <?= json_encode($allCommandes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS) ?>;
+     </script>
 <script>
 function telechargerPDF() {
     const btn = document.getElementById('btn-download-pdf');

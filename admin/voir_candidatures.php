@@ -222,60 +222,39 @@ if ($page > $total_pages && $total_pages > 0) {
 }
 
 /* ══════════════════════════════════════════
-   PRINT — PROFESSIONNEL 2026
+   IMPRESSION — PROFESSIONNELLE 2026
 ══════════════════════════════════════════ */
 @media print {
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 
-    /* Masquer tout sauf le contenu imprimable */
-    aside, header, .no-print, #admin-mobile-nav, #admin-overlay,
-    #admin-menu-btn, .print-hidden { display: none !important; }
+    .sidebar, .ac-topbar, #side-overlay, .no-print, .print-hidden { display: none !important; }
 
-    body {
-        background: #fff !important;
-        margin: 0; padding: 0;
-        font-family: 'Segoe UI', Arial, sans-serif;
-    }
-
+    body { background: #fff !important; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    .main { margin-left: 0 !important; }
     main { padding: 0 !important; margin: 0 !important; }
 
-    /* ── Entête impression ── */
     .print-header { display: flex !important; }
 
-    /* ── Reset container ── */
     .bg-white { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
     .overflow-x-auto { overflow: visible !important; }
 
-    /* ── Table propre ── */
-    table {
-        width: 100% !important; border-collapse: collapse !important;
-        margin-top: 0 !important; font-size: 11px !important;
-    }
-    thead tr {
-        background: #16a34a !important;
-        color: #fff !important;
-    }
+    table { width: 100% !important; border-collapse: collapse !important; margin-top: 0 !important; font-size: 10px !important; }
+    thead tr { background: #16a34a !important; color: #fff !important; }
     thead th {
-        padding: 10px 12px !important; font-weight: 800 !important;
-        font-size: 10px !important; text-transform: uppercase;
-        letter-spacing: 0.08em; border: none !important;
-        color: #fff !important;
+        padding: 9px 68px !important; font-weight: 800 !important;
+        font-size: 9px !important; text-transform: uppercase;
+        letter-spacing: 0.06em; border: none !important; color: #fff !important;
     }
     tbody tr { border-bottom: 1px solid #f1f5f9 !important; }
-    tbody tr:nth-child(even) { background: #f8fafc !important; }
-    tbody td { padding: 10px 12px !important; border: none !important; color: #1e293b !important; }
-
-    /* Badge statut impression */
-    .badge-attente { background: #fef3c7 !important; color: #92400e !important; padding: 2px 8px; border-radius: 99px; font-weight: 800; font-size: 10px; }
-    .badge-valide  { background: #dcfce7 !important; color: #15803d !important; padding: 2px 8px; border-radius: 99px; font-weight: 800; font-size: 10px; }
-    .badge-refuse  { background: #fee2e2 !important; color: #b91c1c !important; padding: 2px 8px; border-radius: 99px; font-weight: 800; font-size: 10px; }
-
-    select { display: none !important; }
-    .statut-print { display: inline !important; }
+    tbody tr:nth-child(even) { background: #f0fdf4 !important; }
+    tbody td { padding: 8px 10px !important; border: none !important; color: #1e293b !important; }
+    #candidatures-table thead { display: table-header-group !important; border-bottom: 1px }
+    #candidatures-table tbody tr { display: table-row !important; border-radius: 0 !important; box-shadow: none !important; }
+    #candidatures-table tbody td { display: table-cell !important; border-bottom: 1px solid #f1f5f9 !important; }
+    #candidatures-table tbody td::before { display: none !important; }
 
     @page { margin: 1.2cm 1.5cm; size: A4 landscape; }
 }
-
 /* Cacher le span de statut sur écran, visible seulement à l'impression */
 .statut-print { display: none; }
 </style>
@@ -480,9 +459,9 @@ if ($page > $total_pages && $total_pages > 0) {
                 </div>
             </td>
 
-            <td class="p-4 md:p-5 text-center no-print" data-label="Actions">
+            <td class="p-4 md:p-5 text-center" data-label="Actions">
                 <button onclick="supprimerCandidature(<?= $c['id'] ?>)"
-                        class="group flex items-center justify-center w-9 h-9 rounded-full bg-red-50 hover:bg-red-600 transition-all mx-auto">
+                        class="group flex items-center justify-center w-9 h-9 rounded-full bg-red-50 hover:bg-red-600 transition-all mx-auto no-print">
                     <i class="fas fa-trash-alt text-red-400 group-hover:text-white transition-colors"></i>
                 </button>
             </td>
@@ -494,7 +473,7 @@ if ($page > $total_pages && $total_pages > 0) {
         </div>
          <!-- PAGINATION -->
             <?php if ($total_pages > 1): ?>
-            <div class="p-4 md:p-5 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="p-4 md:p-5 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
                 <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">
                     Page <?= $page ?> sur <?= $total_pages ?>
                 </span>
@@ -526,7 +505,7 @@ if ($page > $total_pages && $total_pages > 0) {
 </main>
 
 <script>
-// Données des candidatures, fournies par le serveur pour la génération du PDF
+    // Données des candidatures, fournies par le serveur pour la génération du PDF
 const candidatsData = <?= json_encode(array_map(function($c) {
     return [
         'nom'    => $c['nom_complet'],
@@ -537,9 +516,6 @@ const candidatsData = <?= json_encode(array_map(function($c) {
         'date'   => !empty($c['created_at']) ? date('d/m/Y', strtotime($c['created_at'])) : ''
     ];
 }, $candidatures), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
-</script>
-
-<script>
 // ══ TÉLÉCHARGEMENT PDF (jsPDF + AutoTable — génération vectorielle fiable) ══
 function telechargerPDF() {
     const btn = document.getElementById('btn-download-pdf');
